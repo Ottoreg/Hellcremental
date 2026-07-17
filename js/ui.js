@@ -8,7 +8,8 @@ class UI {
     this.$ = (id) => document.getElementById(id);
     this.shopBuilt = false;
     this.view = 'game';
-    this.mq = window.matchMedia('(max-width: 860px)');
+    // « Mobile » = petit écran en largeur (portrait) OU en hauteur (paysage).
+    this.mq = window.matchMedia('(max-width: 860px), (max-height: 600px)');
     this.bind();
   }
 
@@ -120,6 +121,8 @@ class UI {
     document.getElementById('app').setAttribute('data-view', view);
     document.querySelectorAll('.nav-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === view));
+    // Le jeu ne tourne QUE sur la vue « jeu » : sur la boutique il est en pause.
+    this.game.paused = (view === 'shop');
     // La vue jeu venant d'apparaître, on recalcule la taille du canevas.
     if (view === 'game') window.dispatchEvent(new Event('resize'));
   }
