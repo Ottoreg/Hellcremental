@@ -3,7 +3,8 @@
  * État global, génération des niveaux, démon + serviteurs, boucle & rendu.
  * ========================================================================= */
 
-const SAVE_KEY = 'hellcremental_save_v1';
+const SAVE_KEY = 'hellcremental_save_v2';
+const SAVE_VERSION = 2;
 
 class Game {
   constructor(canvas) {
@@ -12,6 +13,7 @@ class Game {
     this.cam = new Camera();
 
     // Progression persistante
+    this.seed = makeSeed();    // graine du joueur (niveaux reproductibles)
     this.souls = 0;
     this.level = 1;
     this.upgrades = {};        // id -> niveau acheté
@@ -34,6 +36,8 @@ class Game {
     this.stats = null;
     this.lastTime = 0;
     this.hover = null;
+    this.pendingRun = null;    // partie en cours restaurée depuis la sauvegarde
+    this._saveThrottle = 0;
 
     this.load();
     this.onChange = () => {};  // callback UI
@@ -41,32 +45,131 @@ class Game {
   }
 
   /* ---------------------- Sauvegarde ---------------------- */
+
+  /* Construit l'objet de sauvegarde complet (progression + partie en cours). */
+  buildSaveObject() {
+    const obj = {
+      version: SAVE_VERSION,
+      seed: this.seed,
+      souls: this.souls,
+      level: this.level,
+      upgrades: this.upgrades,
+      totalDestroyed: this.totalDestroyed,
+      bestLevel: this.bestLevel,
+      run: null,
+    };
+    // On enregistre la partie en cours pour pouvoir la reprendre à l'identique.
+    if (this.phase === 'playing') {
+      obj.run = {
+        level: this.level,
+        timeLeft: this.timeLeft,
+        gridSize: this.gridSize,
+        runDestroyed: this.runDestroyed,
+        runSouls: this.runSouls,
+        totalToDestroy: this.totalToDestroy,
+        targets: this.targets
+          .filter(t => !t.dead)
+          .map(t => ({ gx: t.gx, gy: t.gy, typeId: t.typeId, hp: t.hp, maxHp: t.maxHp, value: t.value })),
+        scorched: this.collectScorched(),
+      };
+    } else if (this.pendingRun) {
+      // Partie restaurée mais pas encore reprise : on la conserve telle quelle.
+      obj.run = this.pendingRun;
+    }
+    return obj;
+  }
+
+  collectScorched() {
+    const out = [];
+    for (let y = 0; y < this.grid.length; y++)
+      for (let x = 0; x < this.grid[y].length; x++)
+        if (this.grid[y][x].scorched) out.push([x, y]);
+    return out;
+  }
+
   save() {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        souls: this.souls, level: this.level, upgrades: this.upgrades,
-        totalDestroyed: this.totalDestroyed, bestLevel: this.bestLevel,
-      }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.buildSaveObject()));
     } catch (e) { /* stockage indisponible : on ignore */ }
   }
+
+  /* Sauvegarde limitée en fréquence (appelée en continu pendant le jeu). */
+  throttledSave(dt) {
+    this._saveThrottle -= dt;
+    if (this._saveThrottle <= 0) { this._saveThrottle = 2; this.save(); }
+  }
+
+  applySaveData(d) {
+    if (!d) return false;
+    this.seed = (typeof d.seed === 'number') ? d.seed : makeSeed();
+    this.souls = d.souls || 0;
+    this.level = d.level || 1;
+    this.upgrades = d.upgrades || {};
+    this.totalDestroyed = d.totalDestroyed || 0;
+    this.bestLevel = d.bestLevel || 1;
+    this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
+    return true;
+  }
+
   load() {
     try {
       const d = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (d) {
-        this.souls = d.souls || 0;
-        this.level = d.level || 1;
-        this.upgrades = d.upgrades || {};
-        this.totalDestroyed = d.totalDestroyed || 0;
-        this.bestLevel = d.bestLevel || 1;
-      }
+      this.applySaveData(d);
     } catch (e) { /* pas de sauvegarde valide */ }
   }
+
+  /* Y a-t-il une partie en cours à reprendre ? */
+  hasResumableRun() { return !!this.pendingRun; }
+
   reset() {
     localStorage.removeItem(SAVE_KEY);
+    this.seed = makeSeed();
     this.souls = 0; this.level = 1; this.upgrades = {};
     this.totalDestroyed = 0; this.bestLevel = 1;
+    this.pendingRun = null;
     this.phase = 'idle';
+    this.save();
     this.onChange();
+  }
+
+  /* ---------------------- Export / Import (transfert d'appareil) ---------------------- */
+
+  /* Encode la sauvegarde en une chaîne texte transférable. */
+  exportSave() {
+    const json = JSON.stringify(this.buildSaveObject());
+    try {
+      // Encodage base64 compatible UTF-8.
+      return 'HELL1:' + btoa(unescape(encodeURIComponent(json)));
+    } catch (e) {
+      return 'HELL0:' + json; // repli sans encodage
+    }
+  }
+
+  /* Restaure une sauvegarde depuis une chaîne exportée. Renvoie true si valide. */
+  importSave(str) {
+    if (!str) return false;
+    str = str.trim();
+    let json;
+    try {
+      if (str.startsWith('HELL1:')) {
+        json = decodeURIComponent(escape(atob(str.slice(6))));
+      } else if (str.startsWith('HELL0:')) {
+        json = str.slice(6);
+      } else if (str.startsWith('{')) {
+        json = str; // JSON brut accepté
+      } else {
+        json = decodeURIComponent(escape(atob(str))); // base64 nu
+      }
+      const d = JSON.parse(json);
+      if (typeof d !== 'object' || d === null) return false;
+      this.applySaveData(d);
+      this.phase = 'idle';
+      this.save();
+      this.onChange();
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   /* ---------------------- Pouvoirs ---------------------- */
@@ -118,66 +221,103 @@ class Game {
   }
 
   /* ---------------------- Génération de niveau ---------------------- */
-  pickTheme() {
+  pickThemeFor(level) {
     let theme = LEVEL_THEMES[0];
-    for (const t of LEVEL_THEMES) if (this.level >= t.min) theme = t;
+    for (const t of LEVEL_THEMES) if (level >= t.min) theme = t;
     return theme;
   }
+  pickTheme() { return this.pickThemeFor(this.level); }
 
-  startRun() {
-    this.computeStats(true);
-    const size = Math.min(CONFIG.GRID_MAX, CONFIG.GRID_MIN + Math.floor((this.level - 1) / 2));
-    this.gridSize = size;
+  /* Génère de façon DÉTERMINISTE la disposition d'un niveau à partir de la
+   * graine du joueur. Le même (graine, niveau) produit toujours le même niveau,
+   * ce qui rend la partie reproductible sur n'importe quel appareil.
+   * Renvoie { gridSize, targets } (données brutes, sans état de rendu). */
+  generateLevel(level) {
+    const theme = this.pickThemeFor(level);
+    const pool = this.buildWeightedPool(theme.pool);
+    const hpMult = 1 + (level - 1) * 0.35;
+    const valMult = 1 + (level - 1) * 0.28;
+    const density = Math.min(0.72, 0.42 + level * 0.02);
+
+    // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
+    // de cibles — le résultat reste identique sur tous les appareils.
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const rand = seededRandom(this.seed, level, attempt);
+      const size = Math.min(CONFIG.GRID_MAX, CONFIG.GRID_MIN + Math.floor((level - 1) / 2));
+      const targets = [];
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (rand() > density) continue;
+          if (x <= 1 && y <= 1) continue; // coin libre pour l'apparition du démon
+          const typeId = pool[Math.floor(rand() * pool.length)];
+          const def = TARGET_TYPES[typeId];
+          const hp = Math.ceil(def.hp * hpMult);
+          targets.push({ gx: x, gy: y, typeId, hp, maxHp: hp, value: Math.ceil(def.value * valMult) });
+        }
+      }
+      if (targets.length >= 3) return { gridSize: size, targets };
+    }
+    // Repli extrêmement improbable.
+    return { gridSize: CONFIG.GRID_MIN, targets: [] };
+  }
+
+  /* Construit la grille + les cibles jouables à partir de données brutes. */
+  buildRunState(gridSize, rawTargets, scorched) {
+    this.gridSize = gridSize;
     this.grid = [];
-    for (let y = 0; y < size; y++) {
+    for (let y = 0; y < gridSize; y++) {
       const row = [];
-      for (let x = 0; x < size; x++) row.push({ scorched: false, occupied: false });
+      for (let x = 0; x < gridSize; x++) row.push({ scorched: false, occupied: false });
       this.grid.push(row);
     }
+    if (scorched) for (const [x, y] of scorched)
+      if (this.grid[y] && this.grid[y][x]) this.grid[y][x].scorched = true;
 
-    // Multiplicateurs de difficulté croissants avec le niveau.
-    const hpMult = 1 + (this.level - 1) * 0.35;
-    const valMult = 1 + (this.level - 1) * 0.28;
-    const theme = this.pickTheme();
-    const pool = this.buildWeightedPool(theme.pool);
+    this.targets = rawTargets.map(t => ({
+      gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
+      hp: t.hp, maxHp: t.maxHp, value: t.value,
+      bob: Math.random() * Math.PI * 2, shake: 0, dead: false, deathT: 0,
+    }));
+    for (const t of this.targets)
+      if (this.grid[t.gy] && this.grid[t.gy][t.gx]) this.grid[t.gy][t.gx].occupied = true;
 
-    // Densité de remplissage.
-    const density = Math.min(0.72, 0.42 + this.level * 0.02);
-    this.targets = [];
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        if (Math.random() > density) continue;
-        // Laisse un coin libre pour l'apparition du démon.
-        if (x <= 1 && y <= 1) continue;
-        const typeId = pool[Math.floor(Math.random() * pool.length)];
-        const def = TARGET_TYPES[typeId];
-        const hp = Math.ceil(def.hp * hpMult);
-        this.targets.push({
-          gx: x, gy: y, typeId, def,
-          hp, maxHp: hp,
-          value: Math.ceil(def.value * valMult),
-          bob: Math.random() * Math.PI * 2,
-          shake: 0, dead: false, deathT: 0,
-        });
-        this.grid[y][x].occupied = true;
-      }
-    }
-    // Garantit au moins quelques cibles.
-    if (this.targets.length < 3) return this.startRun();
-
-    this.totalToDestroy = this.targets.length;
-    this.runDestroyed = 0;
-    this.runSouls = 0;
     this.particles = [];
     this.floaters = [];
-
-    // Crée le démon + serviteurs.
     this.attackers = [];
     this.attackers.push(this.makeAttacker(true));
     for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker(false));
+  }
 
+  /* Démarre une nouvelle vie sur le niveau courant (niveau frais). */
+  startRun() {
+    this.pendingRun = null;
+    this.computeStats(true);
+    const gen = this.generateLevel(this.level);
+    this.buildRunState(gen.gridSize, gen.targets, null);
+    this.totalToDestroy = this.targets.length;
+    this.runDestroyed = 0;
+    this.runSouls = 0;
     this.phase = 'playing';
     this.cam.fit(this.gridSize, this.canvas.clientWidth, this.canvas.clientHeight);
+    this.save();
+    this.onChange();
+  }
+
+  /* Reprend une partie sauvegardée (éventuellement depuis un autre appareil). */
+  resumeRun() {
+    const r = this.pendingRun;
+    if (!r) { return this.startRun(); }
+    this.pendingRun = null;
+    this.level = r.level || this.level;
+    this.computeStats(false);
+    this.buildRunState(r.gridSize, r.targets, r.scorched);
+    this.totalToDestroy = r.totalToDestroy || (this.targets.length + (r.runDestroyed || 0));
+    this.runDestroyed = r.runDestroyed || 0;
+    this.runSouls = r.runSouls || 0;
+    this.timeLeft = (typeof r.timeLeft === 'number' && r.timeLeft > 0) ? r.timeLeft : this.stats.lifespan;
+    this.phase = 'playing';
+    this.cam.fit(this.gridSize, this.canvas.clientWidth, this.canvas.clientHeight);
+    this.save();
     this.onChange();
   }
 
@@ -208,6 +348,7 @@ class Game {
 
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
+    this.throttledSave(dt); // persiste régulièrement la partie en cours
 
     const s = this.stats;
     for (const a of this.attackers) {
@@ -412,13 +553,17 @@ class Game {
   /* ---------------------- Rendu ---------------------- */
   render() {
     const ctx = this.ctx, cam = this.cam;
-    const W = this.canvas.width, H = this.canvas.height;
-    ctx.clearRect(0, 0, W, H);
+    const dpr = this.dpr || 1;
 
-    if (this.phase === 'idle') return;
+    // Nettoie tout le canevas (en pixels périphériques), puis dessine à
+    // l'échelle CSS via la transformation HiDPI (indispensable sur mobile).
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.phase === 'idle') { return; }
 
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // --- Sol : losanges ---
     for (let y = 0; y < this.gridSize; y++) {

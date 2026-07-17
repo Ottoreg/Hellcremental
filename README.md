@@ -36,19 +36,57 @@ isométrique 2D — avant de te faire exorciser.
    - ☄️ **Clic Cataclysmique** — clic plus puissant
 5. Deviens assez fort pour **nettoyer un niveau entier** et progresser.
 
-La progression (âmes, niveau, pouvoirs) est **sauvegardée automatiquement** dans
-le navigateur (`localStorage`).
+La progression (âmes, niveau, pouvoirs **et la partie en cours**) est
+**sauvegardée automatiquement** dans le navigateur (`localStorage`).
+
+## 💾 Sauvegarde & niveaux reproductibles
+
+- **Niveaux aléatoires mais déterministes.** Chaque joueur possède une *graine*
+  (seed) sauvegardée. La génération des niveaux est aléatoire mais **reproductible**
+  à partir de cette graine : le même joueur retrouvera toujours la même suite de
+  niveaux, à l'identique.
+- **Reprise exacte.** La partie en cours est sauvegardée en continu (niveau,
+  chronomètre, points de vie de chaque cible, tuiles calcinées). En rouvrant le
+  jeu, le bouton **« Reprendre la partie »** te remet exactement où tu en étais.
+- **Transfert entre appareils.** Sans serveur, la synchronisation automatique
+  n'est pas possible ; le menu **⚙️ Options & sauvegarde** permet donc d'**exporter**
+  ta partie sous forme de code, puis de l'**importer** sur un autre appareil pour
+  continuer là où tu t'étais arrêté.
+
+## 📱 Application mobile (PWA)
+
+Hellcremental est une **Progressive Web App** installable :
+
+- **Installable** sur l'écran d'accueil (mobile & bureau) via le bouton 📲 ou le
+  menu du navigateur.
+- **Fonctionne hors-ligne** grâce à un *service worker* qui met la coquille de
+  l'app en cache.
+- **Interface tactile et responsive** : mise en page adaptée aux petits écrans,
+  gestion du *notch* (safe-area), et jeu au doigt.
+
+> ℹ️ L'installation et le mode hors-ligne nécessitent que le jeu soit servi via
+> **http(s)** ou **localhost** (le service worker ne fonctionne pas en `file://`).
+> Pour tester en local :
+> ```bash
+> npx serve .        # ou : python3 -m http.server
+> ```
+> puis ouvre l'adresse indiquée. Le jeu reste jouable en ouvrant directement
+> `index.html`, mais sans installation ni cache hors-ligne.
 
 ## 🧱 Structure du projet
 
 ```
-index.html          Structure de la page (HUD, scène, boutique)
-css/style.css       Thème sombre & infernal, mise en page responsive
+index.html          Structure de la page (HUD, scène, boutique, menu, PWA)
+manifest.json       Manifeste PWA (nom, icônes, couleurs, installation)
+service-worker.js   Cache hors-ligne & installation
+icons/              Icônes de l'application (SVG + PNG 192/512 + maskable)
+css/style.css       Thème sombre & infernal, mise en page responsive & mobile
 js/config.js        Équilibrage : cibles, thèmes de niveaux, pouvoirs
+js/rng.js           Générateur aléatoire à graine (niveaux déterministes)
 js/iso.js           Rendu isométrique (conversions grille↔écran, caméra)
-js/game.js          Logique : état, génération de niveau, boucle, rendu
-js/ui.js            Interface : HUD, boutique, écrans de fin
-js/main.js          Point d'entrée : redimensionnement, entrées, boucle d'animation
+js/game.js          Logique : état, génération, sauvegarde/reprise, boucle, rendu
+js/ui.js            Interface : HUD, boutique, menu, écrans de fin, install PWA
+js/main.js          Point d'entrée : redimensionnement, entrées, service worker, boucle
 ```
 
 ## 🛠️ Technologies

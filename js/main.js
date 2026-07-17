@@ -19,6 +19,7 @@
     const w = canvas.clientWidth, h = canvas.clientHeight;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
+    game.dpr = dpr;
     game.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (game.phase !== 'idle') game.cam.fit(game.gridSize, w, h);
   }
@@ -55,9 +56,23 @@
     requestAnimationFrame(frame);
   }
 
+  /* ---- Sauvegarde à la mise en arrière-plan / fermeture ---- */
+  function persist() { if (game.phase === 'playing') game.save(); }
+  window.addEventListener('pagehide', persist);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
+
+  /* ---- Service Worker (PWA hors-ligne + installation) ---- */
+  // Nécessite un serveur http(s) ou localhost (indisponible en file://).
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => { /* ignoré */ });
+    });
+  }
+
   // Démarrage.
   resize();
   ui.buildShop();
   ui.refresh();
+  ui.showStartScreen(); // affiche l'écran d'accueil (avec « Reprendre » si besoin)
   requestAnimationFrame(frame);
 })();

@@ -2,8 +2,20 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Hellcremental — Le Petit Démon Destructeur</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c1121f">
+  <meta name="description" content="Jeu incrémental : incarne un petit démon et détruis tout sur une grille isométrique avant d'être exorcisé.">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hellcremental">
+
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -26,14 +38,16 @@
           <span class="stat-icon">🗺️</span>
           <div><b id="level">1</b><small>niveau</small></div>
         </div>
-        <div class="stat">
+        <div class="stat hide-narrow">
           <span class="stat-icon">🏆</span>
           <div><b id="best">1</b><small>record</small></div>
         </div>
-        <div class="stat">
+        <div class="stat hide-narrow">
           <span class="stat-icon">🔥</span>
           <div><b id="total-destroyed">0</b><small>ravages</small></div>
         </div>
+        <button id="install-btn" class="icon-btn hidden" title="Installer l'application">📲</button>
+        <button id="menu-btn" class="icon-btn" title="Options">⚙️</button>
       </div>
     </header>
 
@@ -70,6 +84,7 @@
               <li>🛒 Dépense les âmes en <b>pouvoirs</b> pour détruire plus vite et survivre plus longtemps.</li>
               <li>🗺️ Nettoie tout un niveau avant l'exorcisme pour passer au suivant, plus difficile.</li>
             </ul>
+            <button id="resume-btn" class="big-btn resume hidden">▸ Reprendre la partie</button>
             <button id="start-btn" class="big-btn">Semer le chaos ▸</button>
           </div>
         </div>
@@ -91,12 +106,52 @@
           <p>Investis tes âmes pour devenir une menace.</p>
         </div>
         <div id="shop-list"></div>
-        <button id="reset-btn" class="reset-btn">↺ Recommencer à zéro</button>
+        <button id="options-btn" class="reset-btn">⚙️ Options &amp; sauvegarde</button>
       </aside>
     </main>
+
+    <!-- Menu Options / Sauvegarde (transfert entre appareils) -->
+    <div id="menu" class="hidden">
+      <div class="menu-card">
+        <button id="menu-close" class="menu-close" title="Fermer">✕</button>
+        <h2>⚙️ Options &amp; sauvegarde</h2>
+
+        <p class="menu-note">
+          Ta progression est <b>sauvegardée automatiquement</b> sur cet appareil.
+          Pour continuer sur un <b>autre appareil</b>, exporte ton code de
+          sauvegarde puis importe-le là-bas.
+        </p>
+
+        <div class="menu-section">
+          <h3>📤 Exporter</h3>
+          <p>Copie ce code et conserve-le pour transférer ta partie.</p>
+          <textarea id="export-code" readonly rows="3" placeholder="Clique sur « Générer »"></textarea>
+          <div class="menu-actions">
+            <button id="export-gen">Générer le code</button>
+            <button id="export-copy">Copier</button>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <h3>📥 Importer</h3>
+          <p>Colle un code de sauvegarde pour restaurer une partie.</p>
+          <textarea id="import-code" rows="3" placeholder="Colle ton code de sauvegarde ici…"></textarea>
+          <div class="menu-actions">
+            <button id="import-apply">Importer</button>
+          </div>
+          <p id="import-msg" class="menu-msg"></p>
+        </div>
+
+        <div class="menu-section danger">
+          <h3>⚠️ Zone de damnation</h3>
+          <button id="reset-btn" class="reset-btn">↺ Recommencer à zéro</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/rng.js"></script>
   <script src="js/iso.js"></script>
   <script src="js/game.js"></script>
   <script src="js/ui.js"></script>

@@ -12,19 +12,50 @@ class UI {
 
   bind() {
     this.$('start-btn').addEventListener('click', () => this.startRun());
+    this.$('resume-btn').addEventListener('click', () => this.resumeRun());
     this.$('overlay-btn').addEventListener('click', () => {
       this.$('overlay').classList.add('hidden');
       this.startRun();
     });
+
+    // --- Menu Options / sauvegarde ---
+    this.$('menu-btn').addEventListener('click', () => this.openMenu());
+    this.$('options-btn').addEventListener('click', () => this.openMenu());
+    this.$('menu-close').addEventListener('click', () => this.closeMenu());
+    this.$('menu').addEventListener('click', (e) => { if (e.target.id === 'menu') this.closeMenu(); });
+
+    this.$('export-gen').addEventListener('click', () => {
+      this.$('export-code').value = this.game.exportSave();
+    });
+    this.$('export-copy').addEventListener('click', () => this.copyExport());
+    this.$('import-apply').addEventListener('click', () => this.doImport());
+
     this.$('reset-btn').addEventListener('click', () => {
       if (confirm('Recommencer depuis le début ? Toute la progression sera perdue.')) {
         this.game.reset();
+        this.closeMenu();
         this.$('overlay').classList.add('hidden');
         this.buildShop();
         this.refresh();
         this.showStartScreen();
       }
     });
+
+    // --- Installation PWA (Android/Chrome/Edge) ---
+    this._deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this._deferredInstall = e;
+      this.$('install-btn').classList.remove('hidden');
+    });
+    this.$('install-btn').addEventListener('click', async () => {
+      if (!this._deferredInstall) return;
+      this._deferredInstall.prompt();
+      await this._deferredInstall.userChoice;
+      this._deferredInstall = null;
+      this.$('install-btn').classList.add('hidden');
+    });
+    window.addEventListener('appinstalled', () => this.$('install-btn').classList.add('hidden'));
   }
 
   startRun() {
@@ -33,8 +64,63 @@ class UI {
     this.refresh();
   }
 
+  resumeRun() {
+    this.$('start-screen').classList.add('hidden');
+    this.game.resumeRun();
+    this.refresh();
+  }
+
   showStartScreen() {
+    // Propose « Reprendre » si une partie est sauvegardée.
+    this.$('resume-btn').classList.toggle('hidden', !this.game.hasResumableRun());
+    this.$('start-btn').textContent = this.game.hasResumableRun()
+      ? 'Nouvelle vie (niveau ' + this.game.level + ') ▸'
+      : 'Semer le chaos ▸';
     this.$('start-screen').classList.remove('hidden');
+  }
+
+  /* ---------------------- Menu ---------------------- */
+  openMenu() {
+    this.$('import-msg').textContent = '';
+    this.$('export-code').value = '';
+    this.$('menu').classList.remove('hidden');
+  }
+  closeMenu() { this.$('menu').classList.add('hidden'); }
+
+  async copyExport() {
+    const ta = this.$('export-code');
+    if (!ta.value) ta.value = this.game.exportSave();
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      this.flashBtn('export-copy', 'Copié ✓');
+    } catch (e) {
+      ta.select();
+      document.execCommand && document.execCommand('copy');
+      this.flashBtn('export-copy', 'Copié ✓');
+    }
+  }
+
+  doImport() {
+    const code = this.$('import-code').value;
+    const msg = this.$('import-msg');
+    if (!code.trim()) { msg.textContent = 'Colle d\'abord un code.'; msg.className = 'menu-msg err'; return; }
+    if (this.game.importSave(code)) {
+      msg.textContent = 'Sauvegarde importée ! Niveau ' + this.game.level + ', ' + this.fmt(this.game.souls) + ' âmes.';
+      msg.className = 'menu-msg ok';
+      this.buildShop();
+      this.refresh();
+      setTimeout(() => { this.closeMenu(); this.showStartScreen(); }, 900);
+    } else {
+      msg.textContent = 'Code invalide ou illisible.';
+      msg.className = 'menu-msg err';
+    }
+  }
+
+  flashBtn(id, text) {
+    const b = this.$(id);
+    const old = b.textContent;
+    b.textContent = text;
+    setTimeout(() => { b.textContent = old; }, 1200);
   }
 
   fmt(n) {

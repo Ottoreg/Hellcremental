@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#3a1418"/>
+      <stop offset="55%" stop-color="#1a0a0c"/>
+      <stop offset="100%" stop-color="#0d0708"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff5c1a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ff5c1a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff4d4d"/>
+      <stop offset="100%" stop-color="#b3121f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="200" fill="url(#glow)"/>
+
+  <!-- Cornes -->
+  <path d="M150 175 C120 120 128 92 150 78 C150 120 176 150 196 168 Z" fill="url(#skin)" stroke="#7a0d16" stroke-width="4"/>
+  <path d="M362 175 C392 120 384 92 362 78 C362 120 336 150 316 168 Z" fill="url(#skin)" stroke="#7a0d16" stroke-width="4"/>
+
+  <!-- Tête -->
+  <path d="M256 150
+           C338 150 388 205 388 278
+           C388 358 330 410 256 410
+           C182 410 124 358 124 278
+           C124 205 174 150 256 150 Z"
+        fill="url(#skin)" stroke="#7a0d16" stroke-width="6"/>
+
+  <!-- Yeux -->
+  <path d="M186 262 l60 -6 l-52 34 Z" fill="#2a0709"/>
+  <path d="M326 262 l-60 -6 l52 34 Z" fill="#2a0709"/>
+  <circle cx="212" cy="270" r="9" fill="#ffd24d"/>
+  <circle cx="300" cy="270" r="9" fill="#ffd24d"/>
+
+  <!-- Sourire crochu -->
+  <path d="M196 330 C230 372 282 372 316 330"
+        fill="none" stroke="#2a0709" stroke-width="12" stroke-linecap="round"/>
+  <path d="M214 340 l10 20 l12 -16 Z" fill="#fff"/>
+  <path d="M298 340 l-10 20 l-12 -16 Z" fill="#fff"/>
+</svg>
