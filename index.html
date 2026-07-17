@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hellcremental — Le Petit Démon Destructeur</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Barre supérieure : ressources & stats -->
+    <header id="topbar">
+      <div class="brand">
+        <span class="brand-icon">😈</span>
+        <div>
+          <h1>Hellcremental</h1>
+          <p>Détruis tout avant l'exorcisme</p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat souls-stat">
+          <span class="stat-icon">💀</span>
+          <div><b id="souls">0</b><small>âmes</small></div>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🗺️</span>
+          <div><b id="level">1</b><small>niveau</small></div>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🏆</span>
+          <div><b id="best">1</b><small>record</small></div>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">🔥</span>
+          <div><b id="total-destroyed">0</b><small>ravages</small></div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Scène de jeu -->
+      <section id="stage">
+        <div id="hud">
+          <div class="hud-row">
+            <span class="hud-label" id="theme-name">Prairie paisible</span>
+            <span class="hud-progress">Détruit : <b id="progress-text">0 / 0</b></span>
+          </div>
+          <div class="bar progress-bar"><div id="progress-fill" class="bar-fill"></div></div>
+          <div class="hud-row">
+            <span class="hud-label">⏳ Avant exorcisme</span>
+            <span class="hud-timer" id="timer-text">0.0s</span>
+          </div>
+          <div class="bar timer-bar"><div id="timer-fill" class="bar-fill"></div></div>
+        </div>
+
+        <canvas id="game"></canvas>
+
+        <!-- Écran de démarrage -->
+        <div id="start-screen">
+          <div class="start-card">
+            <div class="start-demon">😈</div>
+            <h2>Petit démon mineur</h2>
+            <p>Tu as surgi des Enfers avec une seule mission : <b>tout réduire en cendres</b>.
+               Mais les prières des mortels te traquent — un chronomètre court avant ton
+               <b>exorcisme</b>.</p>
+            <ul class="start-tips">
+              <li>😈 Le démon détruit automatiquement les cibles les plus proches.</li>
+              <li>🖱️ <b>Clique</b> une cible pour la cibler et lui infliger un clic infernal.</li>
+              <li>💀 Chaque destruction récolte des <b>âmes</b> — la monnaie de la damnation.</li>
+              <li>🛒 Dépense les âmes en <b>pouvoirs</b> pour détruire plus vite et survivre plus longtemps.</li>
+              <li>🗺️ Nettoie tout un niveau avant l'exorcisme pour passer au suivant, plus difficile.</li>
+            </ul>
+            <button id="start-btn" class="big-btn">Semer le chaos ▸</button>
+          </div>
+        </div>
+
+        <!-- Overlay de fin de vie -->
+        <div id="overlay" class="hidden">
+          <div class="overlay-card">
+            <h2 id="overlay-title"></h2>
+            <div id="overlay-body"></div>
+            <button id="overlay-btn" class="big-btn"></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Boutique de pouvoirs -->
+      <aside id="shop">
+        <div class="shop-head">
+          <h2>🛒 Pactes infernaux</h2>
+          <p>Investis tes âmes pour devenir une menace.</p>
+        </div>
+        <div id="shop-list"></div>
+        <button id="reset-btn" class="reset-btn">↺ Recommencer à zéro</button>
+      </aside>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/iso.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
