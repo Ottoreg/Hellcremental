@@ -187,12 +187,13 @@ class Game {
     return node ? node.parent : null;
   }
 
-  /* Un pacte est débloqué si sa branche part du démon, ou si son parent a été
-   * invoqué au moins une fois (niveau >= 1). */
+  /* Un pacte est débloqué si sa branche part du démon, ou si son parent a
+   * atteint le niveau requis (1 par défaut, davantage pour certains pactes). */
   isUnlocked(id) {
-    const parent = this.parentOf(id);
+    const node = SKILL_TREE.find(n => n.id === id);
+    const parent = node && node.parent;
     if (!parent || parent === 'root') return true;
-    return this.upgradeLevel(parent) >= 1;
+    return this.upgradeLevel(parent) >= (node.req || 1);
   }
 
   buyUpgrade(id) {
@@ -220,7 +221,7 @@ class Game {
       moveSpeed: CONFIG.BASE_MOVE_SPEED,
       lifespan: CONFIG.BASE_LIFESPAN,
       clickDamage: CONFIG.BASE_CLICK_DAMAGE,
-      splash: 0, soulMult: 1, minions: 0,
+      splash: 0, soulMult: 1, minions: 0, demolisher: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -300,8 +301,9 @@ class Game {
     this.particles = [];
     this.floaters = [];
     this.attackers = [];
-    this.attackers.push(this.makeAttacker(true));
-    for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker(false));
+    this.attackers.push(this.makeAttacker('demon'));
+    for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker('minion'));
+    if (this.stats.demolisher > 0) this.attackers.push(this.makeAttacker('demolisher'));
   }
 
   /* Démarre une nouvelle vie sur le niveau courant (niveau frais). */
@@ -352,9 +354,12 @@ class Game {
     return arr;
   }
 
-  makeAttacker(isDemon) {
+  makeAttacker(kind) {
+    const isDemon = kind === 'demon';
     return {
+      kind,
       isDemon,
+      isDemolisher: kind === 'demolisher',
       gx: isDemon ? 0.4 : Math.random() * 0.8,
       gy: isDemon ? 0.4 : Math.random() * 0.8,
       target: null,
@@ -388,10 +393,11 @@ class Game {
       const t = a.target;
       const dx = t.gx - a.gx, dy = t.gy - a.gy;
       const dist = Math.hypot(dx, dy);
+      // Le Démolisseur est plus lent (c'est un colosse).
+      const spd = a.isDemolisher ? s.moveSpeed * 0.85 : s.moveSpeed;
       if (dist > 0.75) {
         // Se déplace vers la cible.
-        const step = s.moveSpeed * dt;
-        const move = Math.min(step, dist);
+        const move = Math.min(spd * dt, dist);
         a.gx += (dx / dist) * move;
         a.gy += (dy / dist) * move;
       } else {
@@ -400,8 +406,7 @@ class Game {
         if (a.cooldown <= 0) {
           a.cooldown = s.attackInterval;
           a.lunge = 1;
-          const dmg = a.isDemon ? s.damage : Math.max(1, s.damage * 0.5);
-          this.hitTarget(t, dmg, a);
+          this.hitTarget(t, this.attackerDamage(a, t, s), a);
         }
       }
     }
@@ -411,13 +416,34 @@ class Game {
   }
 
   nearestTarget(a) {
+    // Le Démolisseur cible en priorité le non-vivant (bâtiments, objets…).
+    if (a.isDemolisher) {
+      const t = this.nearestWhere(a, (o) => !o.def.living);
+      if (t) return t;
+    }
+    return this.nearestWhere(a, null);
+  }
+
+  nearestWhere(a, filter) {
     let best = null, bd = Infinity;
     for (const t of this.targets) {
       if (t.dead) continue;
+      if (filter && !filter(t)) continue;
       const d = (t.gx - a.gx) ** 2 + (t.gy - a.gy) ** 2;
       if (d < bd) { bd = d; best = t; }
     }
     return best;
+  }
+
+  /* Dégâts d'un attaquant sur une cible donnée. */
+  attackerDamage(a, t, s) {
+    if (a.isDemon) return s.damage;
+    if (a.isDemolisher) {
+      let dmg = s.damage * 2;                 // colosse : frappe lourde
+      if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
+      return dmg;
+    }
+    return Math.max(1, s.damage * 0.5);       // serviteur
   }
 
   hitTarget(t, dmg, source) {
@@ -706,29 +732,34 @@ class Game {
     const w = Iso.toScreen(a.gx, a.gy);
     const p = this.cam.worldToScreen(w.x, w.y);
     const scale = this.cam.scale;
-    const size = Math.round((a.isDemon ? 34 : 24) * scale);
+    const emoji = a.isDemon ? '😈' : a.isDemolisher ? '👹' : '👿';
+    const base = a.isDemon ? 34 : a.isDemolisher ? 44 : 24; // le colosse est plus grand
+    const size = Math.round(base * scale);
     const bobY = Math.sin(a.bob) * 2.5 * scale;
     const lungeY = a.lunge * 6 * scale;
 
     // Ombre.
+    const shW = a.isDemon ? 15 : a.isDemolisher ? 19 : 11;
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 2 * scale, (a.isDemon ? 15 : 11) * scale, (a.isDemon ? 7 : 5) * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + 2 * scale, shW * scale, (shW / 2) * scale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Aura du démon.
-    if (a.isDemon) {
-      const grd = ctx.createRadialGradient(p.x, p.y - 16 * scale, 2, p.x, p.y - 16 * scale, 26 * scale);
-      grd.addColorStop(0, 'rgba(255,60,0,0.35)');
-      grd.addColorStop(1, 'rgba(255,60,0,0)');
+    // Aura (démon : rouge ; démolisseur : violet).
+    if (a.isDemon || a.isDemolisher) {
+      const rad = (a.isDemolisher ? 32 : 26) * scale;
+      const grd = ctx.createRadialGradient(p.x, p.y - 16 * scale, 2, p.x, p.y - 16 * scale, rad);
+      const col = a.isDemolisher ? '150,40,220' : '255,60,0';
+      grd.addColorStop(0, `rgba(${col},0.38)`);
+      grd.addColorStop(1, `rgba(${col},0)`);
       ctx.fillStyle = grd;
       ctx.beginPath();
-      ctx.arc(p.x, p.y - 16 * scale, 26 * scale, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y - 16 * scale, rad, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.font = `${size}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(a.isDemon ? '😈' : '👿', p.x, p.y - 16 * scale + bobY - lungeY);
+    ctx.fillText(emoji, p.x, p.y - 16 * scale + bobY - lungeY);
   }
 }
