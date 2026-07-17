@@ -36,6 +36,9 @@ html, body {
 #topbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 10px 18px;
+  /* Respecte l'encoche/caméra (iPhone en paysage) sur les bords. */
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
   background: linear-gradient(180deg, #24141a, #150c0e);
   border-bottom: 2px solid var(--border);
   box-shadow: 0 4px 14px rgba(0,0,0,.5);
@@ -87,7 +90,8 @@ html, body {
 
 /* Indicateur compact en haut à droite de l'écran de jeu (x/x + temps). */
 #hud {
-  position: absolute; top: 12px; right: 12px; left: auto;
+  position: absolute; top: 12px; left: auto;
+  right: max(12px, env(safe-area-inset-right));
   display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
   background: rgba(15,8,10,.62); border: 1px solid var(--border);
   border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(4px);
@@ -106,12 +110,18 @@ html, body {
 /* ---------------- Écran de démarrage / Overlay ---------------- */
 #start-screen, #overlay {
   position: absolute; inset: 0; z-index: 6;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(8,4,5,.78); backdrop-filter: blur(3px); padding: 18px;
+  display: flex; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: rgba(8,4,5,.78); backdrop-filter: blur(3px);
+  padding: 18px;
+  /* Évite l'encoche/caméra (iPhone en paysage) sur les bords. */
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
 }
 .hidden { display: none !important; }
 
 .start-card, .overlay-card {
+  /* margin auto : centré quand il y a la place, défilable sinon (paysage court). */
+  margin: auto;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 2px solid var(--border); border-radius: 18px;
   padding: 26px 30px; max-width: 480px; width: 100%;
@@ -154,6 +164,23 @@ html, body {
 }
 .ov-stats span { display: block; font-size: 19px; font-weight: bold; color: var(--ember-2); }
 .ov-stats label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+/* Résumé compact sur écran court (téléphone en paysage) pour éviter le débordement. */
+@media (max-height: 540px) {
+  .start-card, .overlay-card { padding: 16px 20px; }
+  .overlay-card h2 { font-size: 20px; margin-bottom: 8px; }
+  .ov-lead { font-size: 12.5px; margin-bottom: 10px; }
+  .ov-stats { gap: 7px; }
+  .ov-stats > div { padding: 7px 8px; }
+  .ov-stats span { font-size: 16px; }
+  .ov-hint { margin: 9px 0 12px; font-size: 11.5px; }
+  .big-btn { padding: 10px 22px; font-size: 15px; }
+  .start-demon { font-size: 44px; }
+  .start-card h2 { font-size: 20px; }
+  .start-card p { font-size: 12.5px; margin-bottom: 10px; }
+  .start-tips { gap: 5px; margin-bottom: 12px; }
+  .start-tips li { font-size: 12px; }
+}
 
 /* ---------------- Boutique ---------------- */
 #shop {
@@ -293,6 +320,11 @@ html, body {
   #app[data-view="shop"] #stage { display: none; }
   #app[data-view="game"] #shop { display: none; }
 
+  /* Encoche/caméra : on éloigne le contenu de la boutique des bords.
+     (Le HUD, les overlays et les onglets gèrent leur propre marge ; la grille
+     du jeu est centrée et n'atteint pas les bords.) */
+  #shop { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
   #shop-list { grid-template-columns: 1fr 1fr; }
   .stats { gap: 6px; }
   .stat { min-width: 58px; padding: 5px 8px; }
@@ -305,6 +337,8 @@ html, body {
     border-top: 2px solid var(--border);
     background: linear-gradient(180deg, #180d10, #0d0708);
     padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   #nav-timer {
     position: absolute; top: 0; left: 0; right: 0; height: 3px;
