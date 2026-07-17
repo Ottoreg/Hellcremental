@@ -285,12 +285,14 @@ class UI {
       const n = g.upgradeLevel(def.id);
       const maxed = n >= def.max;
       const cost = g.upgradeCost(def);
+      const unlocked = g.isUnlocked(def.id);
       el.querySelector('[data-lvl]').textContent = maxed ? 'MAX' : `Niv. ${n}`;
-      el.querySelector('[data-cost]').textContent = maxed ? '✓ MAX' : `💀 ${this.fmt(cost)}`;
-      const affordable = !maxed && g.souls >= cost;
+      el.querySelector('[data-cost]').textContent =
+        !unlocked ? '🔒 Verrouillé' : maxed ? '✓ MAX' : `💀 ${this.fmt(cost)}`;
+      const affordable = unlocked && !maxed && g.souls >= cost;
       el.classList.toggle('affordable', affordable);
-      el.classList.toggle('maxed', maxed);
-      el.classList.toggle('locked', !maxed && !affordable);
+      el.classList.toggle('maxed', maxed && unlocked);
+      el.classList.toggle('locked', !unlocked);
       const line = this.$('tree-links').querySelector(`line[data-id="${def.id}"]`);
       if (line) line.classList.toggle('lit', n > 0);
     }
@@ -470,15 +472,28 @@ class UI {
     const n = g.upgradeLevel(def.id);
     const maxed = n >= def.max;
     const cost = g.upgradeCost(def);
+    const unlocked = g.isUnlocked(def.id);
     this.$('node-emoji').textContent = def.emoji;
     this.$('node-name').textContent = def.name;
-    this.$('node-lvl').textContent = maxed ? 'Niveau MAX' : `Niveau ${n} / ${def.max}`;
+    this.$('node-lvl').textContent = !unlocked ? '🔒 Verrouillé'
+      : maxed ? 'Niveau MAX' : `Niveau ${n} / ${def.max}`;
     this.$('node-desc').textContent = def.desc;
+
     const eff = this.$('node-effect');
+    const buy = this.$('node-buy');
+    if (!unlocked) {
+      // Nom du pacte parent à invoquer d'abord.
+      const parentDef = UPGRADES.find((u) => u.id === g.parentOf(def.id));
+      const pname = parentDef ? parentDef.name : 'le pacte précédent';
+      eff.innerHTML = `<span class="nxt">🔒 Invoque d'abord « ${pname} » pour débloquer ce pacte.</span>`;
+      buy.disabled = true;
+      buy.textContent = `🔒 Nécessite « ${pname} »`;
+      return;
+    }
+
     const cur = n > 0 ? `Actuel : ${def.effect(n)}` : 'Pas encore invoqué';
     eff.innerHTML = `<span>${cur}</span>` +
       (maxed ? '' : `<span class="nxt">Prochain niveau : ${def.effect(n + 1)}</span>`);
-    const buy = this.$('node-buy');
     if (maxed) { buy.disabled = true; buy.textContent = '✓ Niveau maximum'; }
     else if (g.souls >= cost) { buy.disabled = false; buy.textContent = `Invoquer · 💀 ${this.fmt(cost)}`; }
     else { buy.disabled = true; buy.textContent = `💀 ${this.fmt(cost)} — pas assez d'âmes`; }
@@ -514,7 +529,7 @@ class UI {
     let affordable = 0;
     for (const def of UPGRADES) {
       const n = g.upgradeLevel(def.id);
-      if (n < def.max && g.souls >= g.upgradeCost(def)) affordable++;
+      if (g.isUnlocked(def.id) && n < def.max && g.souls >= g.upgradeCost(def)) affordable++;
     }
     if (affordable > 0) { badge.textContent = affordable; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');

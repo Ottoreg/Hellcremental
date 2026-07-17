@@ -181,9 +181,24 @@ class Game {
     return Math.floor(def.baseCost * Math.pow(def.mult, n));
   }
 
+  /* Parent d'un pacte dans l'arbre (null pour les branches issues du démon). */
+  parentOf(id) {
+    const node = SKILL_TREE.find(n => n.id === id);
+    return node ? node.parent : null;
+  }
+
+  /* Un pacte est débloqué si sa branche part du démon, ou si son parent a été
+   * invoqué au moins une fois (niveau >= 1). */
+  isUnlocked(id) {
+    const parent = this.parentOf(id);
+    if (!parent || parent === 'root') return true;
+    return this.upgradeLevel(parent) >= 1;
+  }
+
   buyUpgrade(id) {
     const def = UPGRADES.find(u => u.id === id);
     if (!def) return false;
+    if (!this.isUnlocked(id)) return false; // parent pas encore invoqué
     const n = this.upgradeLevel(id);
     if (n >= def.max) return false;
     const cost = this.upgradeCost(def);
