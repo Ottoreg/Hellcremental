@@ -37,6 +37,7 @@ class Game {
     this.lastTime = 0;
     this.hover = null;
     this.pendingRun = null;    // partie en cours restaurée depuis la sauvegarde
+    this.paused = false;       // vrai quand on est sur la vue boutique
     this._saveThrottle = 0;
 
     this.load();
@@ -353,6 +354,8 @@ class Game {
     // Particules et textes flottants tournent en permanence.
     this.updateEffects(dt);
     if (this.phase !== 'playing') return;
+    // Sur la vue boutique, le jeu est gelé : ni chrono, ni démon.
+    if (this.paused) return;
 
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }

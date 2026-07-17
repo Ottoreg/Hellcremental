@@ -279,7 +279,9 @@ html, body {
 .hide-narrow { display: flex; }
 
 /* --- Mobile : deux vues plein écran (jeu / boutique) + onglets en bas --- */
-@media (max-width: 860px) {
+/* Le mode « deux vues » vise les téléphones : petit écran en largeur (portrait)
+   OU en hauteur (paysage — un téléphone couché dépasse souvent 860px de large). */
+@media (max-width: 860px), (max-height: 600px) {
   #main { position: relative; flex-direction: column; }
 
   /* Le jeu et la boutique occupent chacun tout l'espace ; on en affiche un seul. */
@@ -402,7 +404,7 @@ html, body {
 }
 
 /* La boutique plein écran (mobile) défile de façon fluide. */
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 600px) {
   #shop { display: flex; flex-direction: column; }
   #shop-list { flex: 1; }
 }
