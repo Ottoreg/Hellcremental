@@ -44,7 +44,6 @@ class UI {
 
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
-    this.$('options-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
     this.$('menu').addEventListener('click', (e) => { if (e.target.id === 'menu') this.closeMenu(); });
 
@@ -436,7 +435,7 @@ class UI {
           <div><span>Niv. ${r.level + 1}</span><label>prochain niveau</label></div>
         </div>
         <p class="ov-hint">Dépense tes âmes dans l'arbre des pactes, puis renais plus puissant.</p>`;
-      btn.textContent = mobile ? '🛒 Améliorer mes pouvoirs ▸' : `Envahir le niveau ${r.level + 1} ▸`;
+      btn.textContent = mobile ? '😈 Améliorer mes pouvoirs ▸' : `Envahir le niveau ${r.level + 1} ▸`;
     } else {
       title.textContent = '✝️ Exorcisé ! ✝️';
       title.className = 'exorcised';
@@ -449,7 +448,7 @@ class UI {
           <div><span>Niv. ${r.level}</span><label>à reconquérir</label></div>
         </div>
         <p class="ov-hint">Renforce-toi avec les âmes récoltées, puis retente ta damnation.</p>`;
-      btn.textContent = mobile ? '🛒 Améliorer mes pouvoirs ▸' : 'Renaître ▸';
+      btn.textContent = mobile ? '😈 Améliorer mes pouvoirs ▸' : 'Renaître ▸';
     }
     ov.classList.remove('hidden');
     this.refresh();

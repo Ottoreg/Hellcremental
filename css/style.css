@@ -407,6 +407,7 @@ html, body {
     color: var(--muted); font-size: 11px; font-weight: bold; letter-spacing: .4px;
   }
   .nav-btn .nav-ico { font-size: 21px; line-height: 1; filter: grayscale(.4) opacity(.7); }
+  .nav-btn .nav-ico.nav-cross { display: inline-block; transform: rotate(180deg); } /* croix renversée */
   .nav-btn.active { color: var(--ember-2); }
   .nav-btn.active .nav-ico { filter: none; }
   .nav-btn.active::after {
