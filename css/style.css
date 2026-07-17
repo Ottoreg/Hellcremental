@@ -285,7 +285,9 @@ html, body {
 .tree-node.affordable { border-color: #8a5a2a; box-shadow: 0 0 16px rgba(255,120,20,.35); }
 .tree-node.maxed { opacity: .8; }
 .tree-node.maxed .tn-cost { color: var(--good); }
-.tree-node.locked { opacity: .6; }
+.tree-node.locked { opacity: .55; }
+.tree-node.locked .tn-emoji { filter: grayscale(1) opacity(.75); }
+.tree-node.locked .tn-cost { color: var(--muted); }
 .tree-node.bought { transform: translate(-50%, -50%) scale(.9); border-color: var(--good); box-shadow: 0 0 20px rgba(123,212,123,.5); }
 
 /* Nœud racine : le démon, non achetable. */
