@@ -6,10 +6,17 @@ class UI {
   constructor(game) {
     this.game = game;
     this.$ = (id) => document.getElementById(id);
-    this.shopBuilt = false;
+    this.treeBuilt = false;
     this.view = 'game';
     // « Mobile » = petit écran en largeur (portrait) OU en hauteur (paysage).
     this.mq = window.matchMedia('(max-width: 860px), (max-height: 600px)');
+    // Arbre de compétences : décalage de panoramique (drag).
+    this.treeOffset = { x: 0, y: 0 };
+    this._treeCentered = false;
+    this._treeDragged = false;
+    // Présentation paginée.
+    this.introPage = 0;
+    this.introCount = 0;
     this.bind();
   }
 
@@ -22,7 +29,10 @@ class UI {
 
     // Onglets mobile : bascule entre le jeu et la boutique.
     document.querySelectorAll('.nav-btn').forEach((b) =>
-      b.addEventListener('click', () => this.setView(b.dataset.view)));
+      b.addEventListener('click', () => { this.setView(b.dataset.view); this.refresh(); }));
+
+    this.bindIntro();
+    this.bindTreePan();
 
     this.$('overlay-btn').addEventListener('click', () => {
       this.$('overlay').classList.add('hidden');
@@ -49,7 +59,7 @@ class UI {
         this.game.reset();
         this.closeMenu();
         this.$('overlay').classList.add('hidden');
-        this.buildShop();
+        this.buildTree();
         this.refresh();
         this.showStartScreen();
       }
@@ -111,6 +121,8 @@ class UI {
       ? 'Nouvelle vie (niveau ' + this.game.level + ') ▸'
       : 'Semer le chaos ▸';
     this.setView('game');
+    this.introPage = 0;
+    this.renderIntro();
     this.$('start-screen').classList.remove('hidden');
     this.refresh();
   }
@@ -123,8 +135,47 @@ class UI {
       b.classList.toggle('active', b.dataset.view === view));
     // Le jeu ne tourne QUE sur la vue « jeu » : sur la boutique il est en pause.
     this.game.paused = (view === 'shop');
-    // La vue jeu venant d'apparaître, on recalcule la taille du canevas.
-    if (view === 'game') window.dispatchEvent(new Event('resize'));
+    if (view === 'game') {
+      // La vue jeu venant d'apparaître, on recalcule la taille du canevas.
+      window.dispatchEvent(new Event('resize'));
+    } else {
+      // La vue Pouvoirs venant d'apparaître : on centre l'arbre au besoin.
+      requestAnimationFrame(() => this.centerTreeIfNeeded());
+    }
+  }
+
+  /* ---------------------- Présentation paginée ---------------------- */
+  bindIntro() {
+    const pages = document.querySelectorAll('.intro-page');
+    this.introCount = pages.length;
+    const dots = this.$('intro-dots');
+    dots.innerHTML = '';
+    for (let i = 0; i < this.introCount; i++) dots.appendChild(document.createElement('span'));
+    this.$('intro-prev').addEventListener('click', () => this.gotoIntro(this.introPage - 1));
+    this.$('intro-next').addEventListener('click', () => this.gotoIntro(this.introPage + 1));
+
+    // Glissement latéral (swipe) pour changer de page.
+    const area = this.$('start-screen');
+    let sx = 0, down = false;
+    area.addEventListener('pointerdown', (e) => { down = true; sx = e.clientX; });
+    area.addEventListener('pointerup', (e) => {
+      if (!down) return; down = false;
+      const dx = e.clientX - sx;
+      if (Math.abs(dx) > 45) this.gotoIntro(this.introPage + (dx < 0 ? 1 : -1));
+    });
+    this.renderIntro();
+  }
+  gotoIntro(i) {
+    this.introPage = Math.max(0, Math.min(this.introCount - 1, i));
+    this.renderIntro();
+  }
+  renderIntro() {
+    document.querySelectorAll('.intro-page').forEach((p, i) =>
+      p.classList.toggle('active', i === this.introPage));
+    const dots = this.$('intro-dots').querySelectorAll('span');
+    dots.forEach((s, i) => s.classList.toggle('on', i === this.introPage));
+    this.$('intro-prev').disabled = this.introPage === 0;
+    this.$('intro-next').disabled = this.introPage === this.introCount - 1;
   }
 
   /* ---------------------- Menu ---------------------- */
@@ -155,7 +206,7 @@ class UI {
     if (this.game.importSave(code)) {
       msg.textContent = 'Sauvegarde importée ! Niveau ' + this.game.level + ', ' + this.fmt(this.game.souls) + ' âmes.';
       msg.className = 'menu-msg ok';
-      this.buildShop();
+      this.buildTree();
       this.refresh();
       setTimeout(() => { this.closeMenu(); this.showStartScreen(); }, 900);
     } else {
@@ -178,56 +229,140 @@ class UI {
     return (n / 1e6).toFixed(2).replace(/\.0+$/, '') + 'M';
   }
 
-  /* ---------------------- Boutique ---------------------- */
-  buildShop() {
-    const box = this.$('shop-list');
-    box.innerHTML = '';
-    for (const def of UPGRADES) {
-      const el = document.createElement('button');
-      el.className = 'upgrade';
-      el.dataset.id = def.id;
-      el.innerHTML = `
-        <div class="up-emoji">${def.emoji}</div>
-        <div class="up-body">
-          <div class="up-head">
-            <span class="up-name">${def.name}</span>
-            <span class="up-lvl" data-lvl></span>
-          </div>
-          <div class="up-desc">${def.desc}</div>
-          <div class="up-foot">
-            <span class="up-effect" data-effect></span>
-            <span class="up-cost" data-cost></span>
-          </div>
-        </div>`;
-      el.addEventListener('click', () => {
-        if (this.game.buyUpgrade(def.id)) {
-          el.classList.add('bought');
-          setTimeout(() => el.classList.remove('bought'), 220);
-          this.refresh();
-        }
-      });
-      box.appendChild(el);
+  /* ---------------------- Arbre de compétences ---------------------- */
+  buildTree() {
+    const world = this.$('tree-world');
+    world.querySelectorAll('.tree-node').forEach((n) => n.remove());
+    const svg = this.$('tree-links');
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const NS = 'http://www.w3.org/2000/svg';
+    const byId = {};
+    SKILL_TREE.forEach((n) => { byId[n.id] = n; });
+
+    // Traits reliant chaque pacte à son parent.
+    for (const node of SKILL_TREE) {
+      if (!node.parent) continue;
+      const p = byId[node.parent];
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+      line.setAttribute('x2', node.x); line.setAttribute('y2', node.y);
+      line.dataset.id = node.id;
+      svg.appendChild(line);
     }
-    this.shopBuilt = true;
+
+    // Nœuds.
+    for (const node of SKILL_TREE) {
+      const isRoot = node.id === 'root';
+      const el = document.createElement(isRoot ? 'div' : 'button');
+      el.className = 'tree-node' + (isRoot ? ' root' : '');
+      el.style.left = node.x + 'px';
+      el.style.top = node.y + 'px';
+      el.dataset.id = node.id;
+      if (isRoot) {
+        el.innerHTML = `<div class="tn-emoji">😈</div>`;
+      } else {
+        const def = UPGRADES.find((u) => u.id === node.id);
+        el.title = def.name + ' — ' + def.desc;
+        el.innerHTML = `
+          <div class="tn-emoji">${def.emoji}</div>
+          <div class="tn-name">${def.name}</div>
+          <div class="tn-lvl" data-lvl></div>
+          <div class="tn-cost" data-cost></div>`;
+        el.addEventListener('click', () => {
+          if (this._treeDragged) return; // c'était un glissement, pas un achat
+          if (this.game.buyUpgrade(node.id)) {
+            el.classList.add('bought');
+            setTimeout(() => el.classList.remove('bought'), 200);
+            this.refresh();
+          }
+        });
+      }
+      world.appendChild(el);
+    }
+    this.treeBuilt = true;
   }
 
-  refreshShop() {
-    if (!this.shopBuilt) this.buildShop();
+  refreshTree() {
+    if (!this.treeBuilt) this.buildTree();
     const g = this.game;
     for (const def of UPGRADES) {
-      const el = this.$('shop-list').querySelector(`[data-id="${def.id}"]`);
+      const el = this.$('tree-world').querySelector(`.tree-node[data-id="${def.id}"]`);
+      if (!el) continue;
       const n = g.upgradeLevel(def.id);
       const maxed = n >= def.max;
       const cost = g.upgradeCost(def);
       el.querySelector('[data-lvl]').textContent = maxed ? 'MAX' : `Niv. ${n}`;
-      el.querySelector('[data-effect]').textContent = n > 0 ? def.effect(n) : def.effect(1) + ' (aperçu)';
-      const costEl = el.querySelector('[data-cost]');
-      costEl.textContent = maxed ? '—' : `💀 ${this.fmt(cost)}`;
+      el.querySelector('[data-cost]').textContent = maxed ? '✓ MAX' : `💀 ${this.fmt(cost)}`;
       const affordable = !maxed && g.souls >= cost;
       el.classList.toggle('affordable', affordable);
-      el.classList.toggle('locked', maxed || !affordable);
-      el.disabled = maxed || !affordable;
+      el.classList.toggle('maxed', maxed);
+      el.classList.toggle('locked', !maxed && !affordable);
+      const line = this.$('tree-links').querySelector(`line[data-id="${def.id}"]`);
+      if (line) line.classList.toggle('lit', n > 0);
     }
+    this.centerTreeIfNeeded();
+  }
+
+  /* --- Panoramique (drag) de l'arbre --- */
+  bindTreePan() {
+    const el = this.$('skilltree');
+    let down = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    const pt = (e) => (e.touches ? e.touches[0] : e);
+    el.addEventListener('pointerdown', (e) => {
+      down = true; this._treeDragged = false;
+      const p = pt(e); sx = p.clientX; sy = p.clientY;
+      ox = this.treeOffset.x; oy = this.treeOffset.y;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!down) return;
+      const p = pt(e);
+      const dx = p.clientX - sx, dy = p.clientY - sy;
+      if (!this._treeDragged && Math.hypot(dx, dy) > 6) {
+        this._treeDragged = true;
+        this.$('tree-hint').classList.add('gone');
+      }
+      if (this._treeDragged) {
+        this.treeOffset.x = ox + dx;
+        this.treeOffset.y = oy + dy;
+        this.applyTreeTransform();
+      }
+    });
+    window.addEventListener('pointerup', () => {
+      down = false;
+      // On lève le drapeau après le clic éventuel (qui suit le pointerup).
+      setTimeout(() => { this._treeDragged = false; }, 0);
+    });
+  }
+
+  clampAxis(off, vp, world) {
+    const pad = 70;
+    if (world + 2 * pad <= vp) return (vp - world) / 2; // monde plus petit : centré
+    return Math.min(pad, Math.max(vp - world - pad, off));
+  }
+
+  applyTreeTransform() {
+    const el = this.$('skilltree');
+    const vpW = el.clientWidth, vpH = el.clientHeight;
+    if (!vpW || !vpH) return;
+    this.treeOffset.x = this.clampAxis(this.treeOffset.x, vpW, TREE_W);
+    this.treeOffset.y = this.clampAxis(this.treeOffset.y, vpH, TREE_H);
+    this.$('tree-world').style.transform =
+      `translate(${this.treeOffset.x}px, ${this.treeOffset.y}px)`;
+  }
+
+  centerTree() {
+    const el = this.$('skilltree');
+    const vpW = el.clientWidth, vpH = el.clientHeight;
+    if (!vpW || !vpH) return false;
+    const root = SKILL_TREE.find((n) => n.id === 'root');
+    this.treeOffset = { x: vpW / 2 - root.x, y: vpH / 2 - root.y };
+    this.applyTreeTransform();
+    return true;
+  }
+
+  centerTreeIfNeeded() {
+    if (this._treeCentered) return;
+    if (this.centerTree()) this._treeCentered = true;
   }
 
   /* ---------------------- HUD ---------------------- */
@@ -237,7 +372,7 @@ class UI {
     this.$('level').textContent = g.level;
     this.$('best').textContent = g.bestLevel;
     this.$('total-destroyed').textContent = this.fmt(g.totalDestroyed);
-    this.refreshShop();
+    this.refreshTree();
 
     const playing = g.phase === 'playing';
     if (playing) {
@@ -300,7 +435,7 @@ class UI {
           <div><span>+${this.fmt(r.bonus)}</span><label>bonus de nettoyage</label></div>
           <div><span>Niv. ${r.level + 1}</span><label>prochain niveau</label></div>
         </div>
-        <p class="ov-hint">Dépense tes âmes dans la boutique, puis renais plus puissant.</p>`;
+        <p class="ov-hint">Dépense tes âmes dans l'arbre des pactes, puis renais plus puissant.</p>`;
       btn.textContent = mobile ? '🛒 Améliorer mes pouvoirs ▸' : `Envahir le niveau ${r.level + 1} ▸`;
     } else {
       title.textContent = '✝️ Exorcisé ! ✝️';

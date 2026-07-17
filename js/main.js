@@ -8,6 +8,7 @@
   const game = new Game(canvas);
   const ui = new UI(game);
   window.__g = game; // accès console pour le débogage
+  window.__ui = ui;
 
   // Recâble les callbacks du jeu vers l'UI.
   game.onChange = () => ui.refresh();
@@ -76,7 +77,7 @@
 
   // Démarrage.
   resize();
-  ui.buildShop();
+  ui.buildTree();
   ui.refresh();
   ui.showStartScreen(); // affiche l'écran d'accueil (avec « Reprendre » si besoin)
   requestAnimationFrame(frame);

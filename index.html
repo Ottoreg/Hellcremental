@@ -72,23 +72,43 @@
 
         <canvas id="game"></canvas>
 
-        <!-- Écran de démarrage -->
+        <!-- Écran de démarrage (présentation paginée, sans défilement) -->
         <div id="start-screen">
           <div class="start-card">
-            <div class="start-demon">😈</div>
-            <h2>Petit démon mineur</h2>
-            <p>Tu as surgi des Enfers avec une seule mission : <b>tout réduire en cendres</b>.
-               Mais les prières des mortels te traquent — un chronomètre court avant ton
-               <b>exorcisme</b>.</p>
-            <ul class="start-tips">
-              <li>😈 Le démon détruit automatiquement les cibles les plus proches.</li>
-              <li>🖱️ <b>Clique</b> une cible pour la cibler et lui infliger un clic infernal.</li>
-              <li>💀 Chaque destruction récolte des <b>âmes</b> — la monnaie de la damnation.</li>
-              <li>🛒 Dépense les âmes en <b>pouvoirs</b> pour détruire plus vite et survivre plus longtemps.</li>
-              <li>🗺️ Nettoie tout un niveau avant l'exorcisme pour passer au suivant, plus difficile.</li>
-            </ul>
-            <button id="resume-btn" class="big-btn resume hidden">▸ Reprendre la partie</button>
-            <button id="start-btn" class="big-btn">Semer le chaos ▸</button>
+            <div class="intro-pages">
+              <div class="intro-page" data-page="0">
+                <div class="start-demon">😈</div>
+                <h2>Petit démon mineur</h2>
+                <p>Tu as surgi des Enfers avec une seule mission : <b>tout réduire en
+                   cendres</b>. Mais les prières des mortels te traquent — un chronomètre
+                   court avant ton <b>exorcisme</b>.</p>
+              </div>
+              <div class="intro-page" data-page="1">
+                <h2>⚔️ Sème le chaos</h2>
+                <ul class="start-tips">
+                  <li>😈 Le démon détruit <b>automatiquement</b> les cibles les plus proches.</li>
+                  <li>👆 <b>Touche</b> une cible pour la viser et lui infliger un clic infernal.</li>
+                  <li>💀 Chaque destruction récolte des <b>âmes</b> — la monnaie de la damnation.</li>
+                </ul>
+              </div>
+              <div class="intro-page" data-page="2">
+                <h2>🌳 Deviens une menace</h2>
+                <ul class="start-tips">
+                  <li>🌳 Dépense tes âmes dans l'<b>arbre des pactes</b> (parcours-le au doigt).</li>
+                  <li>🗺️ Nettoie tout un niveau avant l'exorcisme pour passer au <b>suivant</b>.</li>
+                  <li>⏳ Exorcisé ? On compte tes ravages, tu renais <b>plus puissant</b>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="intro-nav">
+              <button id="intro-prev" class="intro-arrow" aria-label="Précédent">‹</button>
+              <div class="intro-dots" id="intro-dots"></div>
+              <button id="intro-next" class="intro-arrow" aria-label="Suivant">›</button>
+            </div>
+            <div class="intro-actions">
+              <button id="resume-btn" class="big-btn resume hidden">▸ Reprendre la partie</button>
+              <button id="start-btn" class="big-btn">Semer le chaos ▸</button>
+            </div>
           </div>
         </div>
 
@@ -102,15 +122,21 @@
         </div>
       </section>
 
-      <!-- Boutique de pouvoirs -->
+      <!-- Arbre des pactes (pouvoirs) -->
       <aside id="shop">
         <div class="shop-head">
-          <h2>🛒 Pactes infernaux</h2>
-          <p>Investis tes âmes pour devenir une menace.</p>
+          <h2>🌳 Arbre des pactes</h2>
+          <p>Glisse pour explorer · touche un pacte pour l'invoquer.</p>
         </div>
         <!-- Lancement / reprise (surtout utile sur mobile, entre deux vies) -->
         <button id="run-control" class="run-control hidden"></button>
-        <div id="shop-list"></div>
+        <!-- Vue pannable de l'arbre de compétences -->
+        <div id="skilltree">
+          <div id="tree-world">
+            <svg id="tree-links" viewBox="0 0 1000 780" preserveAspectRatio="none"></svg>
+          </div>
+          <div id="tree-hint">✥ glisse pour explorer</div>
+        </div>
         <button id="options-btn" class="reset-btn">⚙️ Options &amp; sauvegarde</button>
       </aside>
     </main>

@@ -118,3 +118,21 @@ const UPGRADES = [
     apply: (s, n) => { s.clickDamage += 6 * n; },
   },
 ];
+
+/* -------------------------------------------------------------------------
+ * Arbre de compétences : position (en coordonnées « monde ») de chaque pouvoir
+ * et lien vers son parent. La vue se parcourt librement au drag.
+ * ------------------------------------------------------------------------- */
+const TREE_W = 1000;
+const TREE_H = 780;
+const SKILL_TREE = [
+  { id: 'root',       x: 500, y: 420 },                    // le démon (non achetable)
+  { id: 'griffes',    x: 500, y: 250, parent: 'root' },
+  { id: 'cataclysme', x: 500, y: 95,  parent: 'griffes' },
+  { id: 'frenesie',   x: 300, y: 175, parent: 'griffes' },
+  { id: 'souffle',    x: 700, y: 175, parent: 'griffes' },
+  { id: 'pattes',     x: 295, y: 430, parent: 'root' },
+  { id: 'longevite',  x: 185, y: 600, parent: 'pattes' },
+  { id: 'recolte',    x: 705, y: 430, parent: 'root' },
+  { id: 'minions',    x: 815, y: 600, parent: 'recolte' },
+];
