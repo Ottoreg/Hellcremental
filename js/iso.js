@@ -43,21 +43,23 @@ const Iso = {
 class Camera {
   constructor() { this.ox = 0; this.oy = 0; this.scale = 1; }
 
-  fit(gridSize, viewW, viewH) {
+  fit(gridSize, viewW, viewH, topInset = 0) {
     // Emprise de la grille en coordonnées monde iso.
     const worldW = gridSize * CONFIG.TILE_W;
     const worldH = gridSize * CONFIG.TILE_H + 80; // marge pour la hauteur des objets
     const pad = 40;
+    // On réserve la place du HUD en haut pour ne pas cacher la grille dessous.
+    const effH = Math.max(60, viewH - topInset);
     this.scale = Math.min(
       (viewW - pad) / worldW,
-      (viewH - pad) / worldH,
-      1.15
+      (effH - pad) / worldH,
+      1.7 // plafond relevé : la grille peut occuper davantage l'espace (paysage)
     );
     this.scale = Math.max(this.scale, 0.35);
-    // Centre : le milieu de la grille (en gx=gy=(size-1)/2) doit être au centre.
+    // Centre horizontalement, et verticalement dans la zone sous le HUD.
     const mid = Iso.toScreen((gridSize - 1) / 2, (gridSize - 1) / 2);
     this.ox = viewW / 2 - mid.x * this.scale;
-    this.oy = viewH / 2 - mid.y * this.scale - 10 * this.scale;
+    this.oy = topInset + effH / 2 - mid.y * this.scale - 10 * this.scale;
   }
 
   worldToScreen(wx, wy) {

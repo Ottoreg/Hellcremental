@@ -24,9 +24,11 @@
     canvas.height = Math.round(h * dpr);
     game.dpr = dpr;
     game.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (game.phase !== 'idle') game.cam.fit(game.gridSize, w, h);
+    if (game.phase !== 'idle') game.refitCamera();
   }
   window.addEventListener('resize', resize);
+  // Après une rotation, les dimensions se stabilisent avec un léger décalage.
+  window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 
   /* ---- Entrées souris/tactile ---- */
   function evtPos(e) {

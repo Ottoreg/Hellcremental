@@ -77,8 +77,19 @@ class UI {
     else this.startRun();
   }
 
+  /* Tente de verrouiller l'orientation en paysage (installé en PWA / plein
+   * écran). Échoue silencieusement dans un onglet classique — l'écran
+   * « Tourne ton téléphone » prend alors le relais. */
+  tryLockLandscape() {
+    try {
+      const o = screen.orientation;
+      if (o && o.lock) o.lock('landscape').catch(() => {});
+    } catch (e) { /* non supporté : ignoré */ }
+  }
+
   startRun() {
     this.$('start-screen').classList.add('hidden');
+    this.tryLockLandscape();
     this.setView('game');
     this.game.startRun();
     this.refresh();
@@ -86,6 +97,7 @@ class UI {
 
   resumeRun() {
     this.$('start-screen').classList.add('hidden');
+    this.tryLockLandscape();
     this.setView('game');
     this.game.resumeRun();
     this.refresh();
@@ -227,13 +239,11 @@ class UI {
     const playing = g.phase === 'playing';
     if (playing) {
       const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
-      this.$('timer-fill').style.width = (frac * 100) + '%';
       this.$('timer-text').textContent = g.timeLeft.toFixed(1) + 's';
       this.$('progress-text').textContent = `${g.runDestroyed} / ${g.totalToDestroy}`;
-      const pf = g.totalToDestroy ? g.runDestroyed / g.totalToDestroy : 0;
-      this.$('progress-fill').style.width = (pf * 100) + '%';
-      this.$('theme-name').textContent = g.pickTheme().name;
-      // Fine barre de survie visible aussi sur l'onglet boutique.
+      // Le compte à rebours s'affole dans les 5 dernières secondes.
+      this.$('hud').classList.toggle('low', g.timeLeft <= 5);
+      // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
       this.$('nav-timer-fill').style.width = (frac * 100) + '%';
     } else {
       this.$('nav-timer-fill').style.width = '100%';

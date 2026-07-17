@@ -19,6 +19,16 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- Invitation à passer en paysage (mobile en portrait) -->
+  <div id="rotate-screen">
+    <div class="rotate-inner">
+      <div class="rotate-phone">📱</div>
+      <h2>Tourne ton téléphone</h2>
+      <p>Hellcremental se joue en <b>mode paysage</b> pour afficher une plus
+         grande grille et détruire plus confortablement.</p>
+    </div>
+  </div>
+
   <div id="app" data-view="game">
     <!-- Barre supérieure : ressources & stats -->
     <header id="topbar">
@@ -54,17 +64,10 @@
     <main id="main">
       <!-- Scène de jeu -->
       <section id="stage">
+        <!-- Indicateur compact (haut-droite) : destruction & temps restant -->
         <div id="hud">
-          <div class="hud-row">
-            <span class="hud-label" id="theme-name">Prairie paisible</span>
-            <span class="hud-progress">Détruit : <b id="progress-text">0 / 0</b></span>
-          </div>
-          <div class="bar progress-bar"><div id="progress-fill" class="bar-fill"></div></div>
-          <div class="hud-row">
-            <span class="hud-label">⏳ Avant exorcisme</span>
-            <span class="hud-timer" id="timer-text">0.0s</span>
-          </div>
-          <div class="bar timer-bar"><div id="timer-fill" class="bar-fill"></div></div>
+          <div class="hud-line"><span class="hud-ico">💥</span><b id="progress-text">0 / 0</b></div>
+          <div class="hud-line hud-time"><span class="hud-ico">⏳</span><b id="timer-text">0.0s</b></div>
         </div>
 
         <canvas id="game"></canvas>

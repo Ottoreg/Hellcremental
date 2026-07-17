@@ -85,24 +85,23 @@ html, body {
 }
 #game { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
-/* HUD superposé */
+/* Indicateur compact en haut à droite de l'écran de jeu (x/x + temps). */
 #hud {
-  position: absolute; top: 12px; left: 12px; right: 12px;
-  background: rgba(15,8,10,.82); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px 14px; backdrop-filter: blur(4px);
-  pointer-events: none; z-index: 3; max-width: 520px;
+  position: absolute; top: 12px; right: 12px; left: auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  background: rgba(15,8,10,.62); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(4px);
+  pointer-events: none; z-index: 3;
+  font-variant-numeric: tabular-nums;
 }
-.hud-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.hud-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
-.hud-progress { font-size: 13px; }
-.hud-progress b { color: var(--ember-2); }
-.hud-timer { font-family: 'Courier New', monospace; font-size: 15px; font-weight: bold; color: var(--holy); }
-
-.bar { height: 9px; background: #2a1416; border-radius: 6px; overflow: hidden; margin-bottom: 8px; border: 1px solid #3a1f22; }
-.bar:last-child { margin-bottom: 0; }
-.bar-fill { height: 100%; width: 0; transition: width .12s linear; }
-.progress-bar .bar-fill { background: linear-gradient(90deg, var(--ember), var(--ember-2)); }
-.timer-bar .bar-fill { background: linear-gradient(90deg, var(--blood), var(--holy)); }
+.hud-line { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 1.1; }
+.hud-line .hud-ico { font-size: 13px; opacity: .9; }
+.hud-line b { font-family: 'Courier New', monospace; font-weight: bold; }
+#progress-text { color: var(--ember-2); }
+.hud-time b { color: var(--holy); }
+/* Derniers instants avant l'exorcisme : le compte à rebours s'affole. */
+#hud.low .hud-time b { color: var(--blood); animation: pulseLow .55s ease-in-out infinite; }
+@keyframes pulseLow { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
 /* ---------------- Écran de démarrage / Overlay ---------------- */
 #start-screen, #overlay {
@@ -353,6 +352,53 @@ html, body {
 @media (hover: none) {
   .upgrade:hover { border-color: var(--border); }
   #game { cursor: default; }
+}
+
+/* ---------------- Invitation au mode paysage ---------------- */
+#rotate-screen { display: none; }
+
+/* Affiché uniquement sur petit écran tenu en portrait. */
+@media (max-width: 860px) and (orientation: portrait) {
+  #rotate-screen {
+    display: flex; position: fixed; inset: 0; z-index: 100;
+    align-items: center; justify-content: center; padding: 28px;
+    background:
+      radial-gradient(ellipse at 50% 35%, #2a1518 0%, #0d0708 72%),
+      repeating-linear-gradient(45deg, #0d0708 0 22px, #100809 22px 44px);
+    text-align: center;
+  }
+  .rotate-inner { max-width: 340px; }
+  .rotate-phone {
+    font-size: 76px; display: inline-block;
+    animation: rotateHint 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 0 16px rgba(255,90,20,.6));
+  }
+  #rotate-screen h2 {
+    font-family: Georgia, serif; font-size: 24px; color: var(--ember-2);
+    margin: 14px 0 10px;
+  }
+  #rotate-screen p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+  #rotate-screen b { color: var(--text); }
+}
+
+@keyframes rotateHint {
+  0%, 40% { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
+
+/* Paysage court : compacter l'entête, le HUD et les onglets pour laisser
+   un maximum de place à la grille. */
+@media (max-width: 960px) and (max-height: 500px) {
+  #topbar { padding: 6px 12px; }
+  .brand-icon { font-size: 24px; }
+  .brand h1 { font-size: 15px; }
+  .stat { padding: 4px 8px; min-width: 52px; }
+  .stat b { font-size: 14px; }
+  #hud { top: 8px; right: 8px; padding: 5px 9px; }
+  .hud-line { font-size: 13px; }
+  .nav-btn { padding: 5px 4px; }
+  .nav-btn .nav-ico { font-size: 18px; }
+  .nav-btn .nav-lbl { font-size: 10px; }
 }
 
 /* La boutique plein écran (mobile) défile de façon fluide. */

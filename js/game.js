@@ -298,9 +298,17 @@ class Game {
     this.runDestroyed = 0;
     this.runSouls = 0;
     this.phase = 'playing';
-    this.cam.fit(this.gridSize, this.canvas.clientWidth, this.canvas.clientHeight);
+    this.refitCamera();
     this.save();
     this.onChange();
+  }
+
+  /* Recadre la caméra sur la grille. Le HUD n'étant plus qu'une petite pastille
+   * dans un coin, la grille peut occuper tout l'espace disponible. */
+  refitCamera() {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (!w || !h) return;
+    this.cam.fit(this.gridSize, w, h, 0);
   }
 
   /* Reprend une partie sauvegardée (éventuellement depuis un autre appareil). */
@@ -316,7 +324,7 @@ class Game {
     this.runSouls = r.runSouls || 0;
     this.timeLeft = (typeof r.timeLeft === 'number' && r.timeLeft > 0) ? r.timeLeft : this.stats.lifespan;
     this.phase = 'playing';
-    this.cam.fit(this.gridSize, this.canvas.clientWidth, this.canvas.clientHeight);
+    this.refitCamera();
     this.save();
     this.onChange();
   }
