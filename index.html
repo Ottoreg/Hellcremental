@@ -112,30 +112,32 @@
           </div>
         </div>
 
-        <!-- Overlay de fin de vie -->
+        <!-- Vue de fin de niveau (côté Chaos) : relancer / niveau suivant -->
         <div id="overlay" class="hidden">
           <div class="overlay-card">
             <h2 id="overlay-title"></h2>
             <div id="overlay-body"></div>
-            <button id="overlay-btn" class="big-btn"></button>
+            <div class="overlay-actions">
+              <button id="overlay-btn" class="big-btn"></button>
+              <button id="overlay-improve" class="big-btn ghost hidden">✝️ Améliorer mes pouvoirs</button>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- Arbre des pactes (pouvoirs) -->
       <aside id="shop">
-        <div class="shop-head">
-          <h2>🌳 Arbre des pactes</h2>
-          <p>Glisse pour explorer · touche un pacte pour l'invoquer.</p>
-        </div>
-        <!-- Lancement / reprise (surtout utile sur mobile, entre deux vies) -->
-        <button id="run-control" class="run-control hidden"></button>
-        <!-- Vue pannable de l'arbre de compétences -->
+        <!-- Vue pannable & zoomable de l'arbre de compétences -->
         <div id="skilltree">
           <div id="tree-world">
             <svg id="tree-links" viewBox="0 0 1000 780" preserveAspectRatio="none"></svg>
           </div>
-          <div id="tree-hint">✥ glisse pour explorer</div>
+          <div id="tree-hint">✥ glisse · pince pour dézoomer</div>
+          <div id="tree-zoom">
+            <button data-z="in" aria-label="Zoomer">＋</button>
+            <button data-z="out" aria-label="Dézoomer">−</button>
+            <button data-z="fit" aria-label="Vue d'ensemble">⤢</button>
+          </div>
         </div>
       </aside>
     </main>
@@ -188,6 +190,23 @@
           <h3>⚠️ Zone de damnation</h3>
           <button id="reset-btn" class="reset-btn">↺ Recommencer à zéro</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Fiche d'un pacte : description avant achat -->
+    <div id="node-modal" class="hidden">
+      <div class="node-card">
+        <button id="node-close" class="menu-close" title="Fermer">✕</button>
+        <div class="node-head">
+          <div class="node-emoji" id="node-emoji"></div>
+          <div class="node-titles">
+            <div class="node-name" id="node-name"></div>
+            <div class="node-lvl" id="node-lvl"></div>
+          </div>
+        </div>
+        <p class="node-desc" id="node-desc"></p>
+        <div class="node-effect" id="node-effect"></div>
+        <button id="node-buy" class="big-btn"></button>
       </div>
     </div>
   </div>
