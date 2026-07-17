@@ -63,6 +63,15 @@ html, body {
 .souls-stat { border-color: #5a3a6a; box-shadow: 0 0 12px rgba(180,120,255,.15) inset; }
 .souls-stat b { color: var(--soul); }
 
+.icon-btn {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 10px; width: 40px; height: 40px; font-size: 19px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, transform .1s;
+}
+.icon-btn:hover { border-color: var(--ember); transform: translateY(-1px); }
+#install-btn { border-color: #6a4a2a; box-shadow: 0 0 12px rgba(255,120,20,.2); }
+
 /* ---------------- Zone principale ---------------- */
 #main { flex: 1; display: flex; min-height: 0; }
 
@@ -76,24 +85,23 @@ html, body {
 }
 #game { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
-/* HUD superposé */
+/* Indicateur compact en haut à droite de l'écran de jeu (x/x + temps). */
 #hud {
-  position: absolute; top: 12px; left: 12px; right: 12px;
-  background: rgba(15,8,10,.82); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px 14px; backdrop-filter: blur(4px);
-  pointer-events: none; z-index: 3; max-width: 520px;
+  position: absolute; top: 12px; right: 12px; left: auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  background: rgba(15,8,10,.62); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(4px);
+  pointer-events: none; z-index: 3;
+  font-variant-numeric: tabular-nums;
 }
-.hud-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.hud-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
-.hud-progress { font-size: 13px; }
-.hud-progress b { color: var(--ember-2); }
-.hud-timer { font-family: 'Courier New', monospace; font-size: 15px; font-weight: bold; color: var(--holy); }
-
-.bar { height: 9px; background: #2a1416; border-radius: 6px; overflow: hidden; margin-bottom: 8px; border: 1px solid #3a1f22; }
-.bar:last-child { margin-bottom: 0; }
-.bar-fill { height: 100%; width: 0; transition: width .12s linear; }
-.progress-bar .bar-fill { background: linear-gradient(90deg, var(--ember), var(--ember-2)); }
-.timer-bar .bar-fill { background: linear-gradient(90deg, var(--blood), var(--holy)); }
+.hud-line { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 1.1; }
+.hud-line .hud-ico { font-size: 13px; opacity: .9; }
+.hud-line b { font-family: 'Courier New', monospace; font-weight: bold; }
+#progress-text { color: var(--ember-2); }
+.hud-time b { color: var(--holy); }
+/* Derniers instants avant l'exorcisme : le compte à rebours s'affole. */
+#hud.low .hud-time b { color: var(--blood); animation: pulseLow .55s ease-in-out infinite; }
+@keyframes pulseLow { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
 /* ---------------- Écran de démarrage / Overlay ---------------- */
 #start-screen, #overlay {
@@ -127,6 +135,12 @@ html, body {
 }
 .big-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(193,18,31,.7); }
 .big-btn:active { transform: translateY(0); }
+.big-btn.resume {
+  background: linear-gradient(180deg, #7a3bd4, #4a1f8a);
+  border-color: #a86bff; box-shadow: 0 6px 18px rgba(120,60,200,.5);
+  margin-bottom: 10px;
+}
+.big-btn.resume:hover { box-shadow: 0 8px 24px rgba(120,60,200,.7); }
 
 .overlay-card h2 { font-family: Georgia, serif; font-size: 26px; margin-bottom: 12px; }
 .overlay-card h2.cleared { color: var(--ember-2); text-shadow: 0 0 18px rgba(255,120,20,.6); }
@@ -188,21 +202,209 @@ html, body {
 }
 .reset-btn:hover { color: var(--blood); border-color: var(--blood); }
 
+/* Bouton de lancement / reprise en tête de boutique (entre deux vies). */
+.run-control {
+  margin: 10px 10px 0; padding: 13px; border-radius: 12px; cursor: pointer;
+  font-family: Georgia, serif; font-size: 15px; font-weight: bold; color: #fff;
+  background: linear-gradient(180deg, var(--ember-2), var(--blood));
+  border: 1px solid #ff9a5c;
+  box-shadow: 0 5px 16px rgba(193,18,31,.45), 0 0 16px rgba(255,90,20,.25) inset;
+  transition: transform .1s, box-shadow .2s;
+}
+.run-control:hover { transform: translateY(-1px); box-shadow: 0 7px 20px rgba(193,18,31,.6); }
+.run-control.resume {
+  background: linear-gradient(180deg, #7a3bd4, #4a1f8a); border-color: #a86bff;
+  box-shadow: 0 5px 16px rgba(120,60,200,.45);
+}
+
+/* ---------------- Barre d'onglets mobile ---------------- */
+#mobile-nav { display: none; }
+.nav-btn { position: relative; }
+
+/* ---------------- Menu Options / sauvegarde ---------------- */
+#menu {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6,3,4,.8); backdrop-filter: blur(4px); padding: 16px;
+}
+.menu-card {
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 2px solid var(--border); border-radius: 18px;
+  padding: 22px; max-width: 460px; width: 100%;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6); animation: pop .25s ease;
+}
+.menu-card h2 { font-family: Georgia, serif; color: var(--ember-2); font-size: 20px; margin-bottom: 10px; }
+.menu-close {
+  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 8px; cursor: pointer; font-size: 15px;
+}
+.menu-close:hover { color: var(--blood); border-color: var(--blood); }
+.menu-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+.menu-note b { color: var(--text); }
+
+.menu-section {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+}
+.menu-section h3 { font-size: 14px; margin-bottom: 4px; color: var(--text); }
+.menu-section p { font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+.menu-section.danger { border-color: #5a1f22; }
+.menu-section textarea {
+  width: 100%; resize: vertical; font-family: 'Courier New', monospace; font-size: 11px;
+  background: #120809; color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px; word-break: break-all;
+}
+.menu-actions { display: flex; gap: 8px; margin-top: 8px; }
+.menu-actions button {
+  flex: 1; padding: 9px; font-size: 13px; font-weight: bold; cursor: pointer;
+  background: linear-gradient(180deg, var(--ember-2), var(--blood));
+  color: #fff; border: 1px solid #ff9a5c; border-radius: 9px;
+  transition: transform .1s;
+}
+.menu-actions button:hover { transform: translateY(-1px); }
+.menu-msg { font-size: 12px; margin-top: 8px; min-height: 16px; }
+.menu-msg.ok { color: var(--good); }
+.menu-msg.err { color: var(--blood); }
+.menu-section.danger .reset-btn { margin: 0; width: 100%; }
+
 /* ---------------- Animations ---------------- */
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 @keyframes pop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-/* ---------------- Responsive ---------------- */
+/* ---------------- Responsive & mobile ---------------- */
+#topbar { padding-top: max(10px, env(safe-area-inset-top)); }
+.hide-narrow { display: flex; }
+
+/* --- Mobile : deux vues plein écran (jeu / boutique) + onglets en bas --- */
 @media (max-width: 860px) {
-  #main { flex-direction: column; }
-  #shop { width: 100%; height: 42%; border-left: none; border-top: 2px solid var(--border); }
-  #stage { height: 58%; flex: none; }
+  #main { position: relative; flex-direction: column; }
+
+  /* Le jeu et la boutique occupent chacun tout l'espace ; on en affiche un seul. */
+  #stage, #shop {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    flex: none; border: none;
+  }
+  #shop { border-left: none; }
+  #app[data-view="shop"] #stage { display: none; }
+  #app[data-view="game"] #shop { display: none; }
+
   #shop-list { grid-template-columns: 1fr 1fr; }
   .stats { gap: 6px; }
-  .stat { min-width: 62px; padding: 5px 8px; }
+  .stat { min-width: 58px; padding: 5px 8px; }
   .brand p { display: none; }
+  #hud { max-width: none; }
+
+  /* Barre d'onglets fixée en bas. */
+  #mobile-nav {
+    display: flex; position: relative; z-index: 8;
+    border-top: 2px solid var(--border);
+    background: linear-gradient(180deg, #180d10, #0d0708);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #nav-timer {
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: #2a1416; overflow: hidden;
+  }
+  #nav-timer-fill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, var(--blood), var(--holy));
+    transition: width .15s linear;
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; padding: 9px 4px; border: none; background: transparent; cursor: pointer;
+    color: var(--muted); font-size: 11px; font-weight: bold; letter-spacing: .4px;
+  }
+  .nav-btn .nav-ico { font-size: 21px; line-height: 1; filter: grayscale(.4) opacity(.7); }
+  .nav-btn.active { color: var(--ember-2); }
+  .nav-btn.active .nav-ico { filter: none; }
+  .nav-btn.active::after {
+    content: ''; position: absolute; bottom: 3px; width: 26px; height: 3px;
+    border-radius: 3px; background: var(--ember-2);
+  }
+  .nav-badge {
+    position: absolute; top: 5px; right: calc(50% - 26px);
+    min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+    background: var(--soul); color: #1a0a1a; font-size: 10px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 8px rgba(180,120,255,.6);
+  }
 }
-@media (max-width: 520px) {
+
+@media (max-width: 620px) {
+  .hide-narrow { display: none; } /* record & ravages masqués pour gagner de la place */
+  .brand h1 { font-size: 17px; }
+  .brand-icon { font-size: 28px; }
+  .stat b { font-size: 15px; }
+  .icon-btn { width: 36px; height: 36px; font-size: 17px; }
+  .shop-head { padding: 10px 12px 8px; }
+  .shop-head p { display: none; }
+}
+
+@media (max-width: 440px) {
   #shop-list { grid-template-columns: 1fr; }
-  .brand h1 { font-size: 18px; }
 }
+
+/* Écrans tactiles : viser reste facile, pas de survol persistant. */
+@media (hover: none) {
+  .upgrade:hover { border-color: var(--border); }
+  #game { cursor: default; }
+}
+
+/* ---------------- Invitation au mode paysage ---------------- */
+#rotate-screen { display: none; }
+
+/* Affiché uniquement sur petit écran tenu en portrait. */
+@media (max-width: 860px) and (orientation: portrait) {
+  #rotate-screen {
+    display: flex; position: fixed; inset: 0; z-index: 100;
+    align-items: center; justify-content: center; padding: 28px;
+    background:
+      radial-gradient(ellipse at 50% 35%, #2a1518 0%, #0d0708 72%),
+      repeating-linear-gradient(45deg, #0d0708 0 22px, #100809 22px 44px);
+    text-align: center;
+  }
+  .rotate-inner { max-width: 340px; }
+  .rotate-phone {
+    font-size: 76px; display: inline-block;
+    animation: rotateHint 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 0 16px rgba(255,90,20,.6));
+  }
+  #rotate-screen h2 {
+    font-family: Georgia, serif; font-size: 24px; color: var(--ember-2);
+    margin: 14px 0 10px;
+  }
+  #rotate-screen p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+  #rotate-screen b { color: var(--text); }
+}
+
+@keyframes rotateHint {
+  0%, 40% { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
+
+/* Paysage court : compacter l'entête, le HUD et les onglets pour laisser
+   un maximum de place à la grille. */
+@media (max-width: 960px) and (max-height: 500px) {
+  #topbar { padding: 6px 12px; }
+  .brand-icon { font-size: 24px; }
+  .brand h1 { font-size: 15px; }
+  .stat { padding: 4px 8px; min-width: 52px; }
+  .stat b { font-size: 14px; }
+  #hud { top: 8px; right: 8px; padding: 5px 9px; }
+  .hud-line { font-size: 13px; }
+  .nav-btn { padding: 5px 4px; }
+  .nav-btn .nav-ico { font-size: 18px; }
+  .nav-btn .nav-lbl { font-size: 10px; }
+}
+
+/* La boutique plein écran (mobile) défile de façon fluide. */
+@media (max-width: 860px) {
+  #shop { display: flex; flex-direction: column; }
+  #shop-list { flex: 1; }
+}
+
+.nav-badge.hidden, #run-control.hidden { display: none !important; }
