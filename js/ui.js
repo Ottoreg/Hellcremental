@@ -7,15 +7,28 @@ class UI {
     this.game = game;
     this.$ = (id) => document.getElementById(id);
     this.shopBuilt = false;
+    this.view = 'game';
+    this.mq = window.matchMedia('(max-width: 860px)');
     this.bind();
   }
+
+  isMobile() { return this.mq.matches; }
 
   bind() {
     this.$('start-btn').addEventListener('click', () => this.startRun());
     this.$('resume-btn').addEventListener('click', () => this.resumeRun());
+    this.$('run-control').addEventListener('click', () => this.beginRun());
+
+    // Onglets mobile : bascule entre le jeu et la boutique.
+    document.querySelectorAll('.nav-btn').forEach((b) =>
+      b.addEventListener('click', () => this.setView(b.dataset.view)));
+
     this.$('overlay-btn').addEventListener('click', () => {
       this.$('overlay').classList.add('hidden');
-      this.startRun();
+      // Sur mobile, on renvoie vers la boutique pour dépenser ses âmes ;
+      // sur grand écran, la boutique est déjà visible, on relance directement.
+      if (this.isMobile()) { this.setView('shop'); this.refresh(); }
+      else this.startRun();
     });
 
     // --- Menu Options / sauvegarde ---
@@ -58,14 +71,22 @@ class UI {
     window.addEventListener('appinstalled', () => this.$('install-btn').classList.add('hidden'));
   }
 
+  /* Lance la bonne action selon l'état (reprise ou nouvelle vie). */
+  beginRun() {
+    if (this.game.hasResumableRun()) this.resumeRun();
+    else this.startRun();
+  }
+
   startRun() {
     this.$('start-screen').classList.add('hidden');
+    this.setView('game');
     this.game.startRun();
     this.refresh();
   }
 
   resumeRun() {
     this.$('start-screen').classList.add('hidden');
+    this.setView('game');
     this.game.resumeRun();
     this.refresh();
   }
@@ -76,7 +97,19 @@ class UI {
     this.$('start-btn').textContent = this.game.hasResumableRun()
       ? 'Nouvelle vie (niveau ' + this.game.level + ') ▸'
       : 'Semer le chaos ▸';
+    this.setView('game');
     this.$('start-screen').classList.remove('hidden');
+    this.refresh();
+  }
+
+  /* Bascule entre la vue jeu et la vue boutique (mobile). */
+  setView(view) {
+    this.view = view;
+    document.getElementById('app').setAttribute('data-view', view);
+    document.querySelectorAll('.nav-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.view === view));
+    // La vue jeu venant d'apparaître, on recalcule la taille du canevas.
+    if (view === 'game') window.dispatchEvent(new Event('resize'));
   }
 
   /* ---------------------- Menu ---------------------- */
@@ -191,7 +224,8 @@ class UI {
     this.$('total-destroyed').textContent = this.fmt(g.totalDestroyed);
     this.refreshShop();
 
-    if (g.phase === 'playing') {
+    const playing = g.phase === 'playing';
+    if (playing) {
       const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
       this.$('timer-fill').style.width = (frac * 100) + '%';
       this.$('timer-text').textContent = g.timeLeft.toFixed(1) + 's';
@@ -199,7 +233,36 @@ class UI {
       const pf = g.totalToDestroy ? g.runDestroyed / g.totalToDestroy : 0;
       this.$('progress-fill').style.width = (pf * 100) + '%';
       this.$('theme-name').textContent = g.pickTheme().name;
+      // Fine barre de survie visible aussi sur l'onglet boutique.
+      this.$('nav-timer-fill').style.width = (frac * 100) + '%';
+    } else {
+      this.$('nav-timer-fill').style.width = '100%';
     }
+
+    // Bouton de lancement/reprise en tête de boutique (masqué pendant le jeu).
+    const rc = this.$('run-control');
+    rc.classList.toggle('hidden', playing);
+    if (!playing) {
+      if (g.hasResumableRun()) {
+        rc.textContent = '▸ Reprendre la partie';
+        rc.classList.add('resume');
+      } else {
+        rc.classList.remove('resume');
+        rc.textContent = (g.level === 1 && g.totalDestroyed === 0)
+          ? '😈 Semer le chaos ▸'
+          : `😈 Envahir le niveau ${g.level} ▸`;
+      }
+    }
+
+    // Pastille sur l'onglet boutique : nombre de pouvoirs abordables.
+    const badge = this.$('nav-shop-badge');
+    let affordable = 0;
+    for (const def of UPGRADES) {
+      const n = g.upgradeLevel(def.id);
+      if (n < def.max && g.souls >= g.upgradeCost(def)) affordable++;
+    }
+    if (affordable > 0) { badge.textContent = affordable; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
   }
 
   /* ---------------------- Écran de fin de vie ---------------------- */
@@ -208,6 +271,10 @@ class UI {
     const title = this.$('overlay-title');
     const body = this.$('overlay-body');
     const btn = this.$('overlay-btn');
+
+    // L'overlay vit dans la vue jeu : on s'assure qu'elle est affichée.
+    this.setView('game');
+    const mobile = this.isMobile();
 
     if (r.cleared) {
       title.textContent = '🔥 Niveau anéanti ! 🔥';
@@ -221,7 +288,7 @@ class UI {
           <div><span>Niv. ${r.level + 1}</span><label>prochain niveau</label></div>
         </div>
         <p class="ov-hint">Dépense tes âmes dans la boutique, puis renais plus puissant.</p>`;
-      btn.textContent = `Envahir le niveau ${r.level + 1} ▸`;
+      btn.textContent = mobile ? '🛒 Améliorer mes pouvoirs ▸' : `Envahir le niveau ${r.level + 1} ▸`;
     } else {
       title.textContent = '✝️ Exorcisé ! ✝️';
       title.className = 'exorcised';
@@ -234,7 +301,7 @@ class UI {
           <div><span>Niv. ${r.level}</span><label>à reconquérir</label></div>
         </div>
         <p class="ov-hint">Renforce-toi avec les âmes récoltées, puis retente ta damnation.</p>`;
-      btn.textContent = 'Renaître ▸';
+      btn.textContent = mobile ? '🛒 Améliorer mes pouvoirs ▸' : 'Renaître ▸';
     }
     ov.classList.remove('hidden');
     this.refresh();

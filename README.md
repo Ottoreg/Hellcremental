@@ -61,8 +61,13 @@ Hellcremental est une **Progressive Web App** installable :
   menu du navigateur.
 - **Fonctionne hors-ligne** grâce à un *service worker* qui met la coquille de
   l'app en cache.
-- **Interface tactile et responsive** : mise en page adaptée aux petits écrans,
-  gestion du *notch* (safe-area), et jeu au doigt.
+- **Interface tactile et responsive** : gestion du *notch* (safe-area) et jeu au doigt.
+- **Deux vues plein écran sur mobile.** Plutôt que de tout entasser sur un seul
+  écran, une **barre d'onglets en bas** sépare complètement le **jeu** (⚔️ Chaos)
+  et les **améliorations** (🛒 Pouvoirs). Le jeu continue de tourner en fond pendant
+  qu'on fait ses achats (une fine barre indique le temps avant exorcisme sur les
+  deux onglets), et une pastille signale les pouvoirs devenus abordables. Sur grand
+  écran, jeu et boutique restent affichés **côte à côte**.
 
 > ℹ️ L'installation et le mode hors-ligne nécessitent que le jeu soit servi via
 > **http(s)** ou **localhost** (le service worker ne fonctionne pas en `file://`).

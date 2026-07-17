@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="app">
+  <div id="app" data-view="game">
     <!-- Barre supérieure : ressources & stats -->
     <header id="topbar">
       <div class="brand">
@@ -105,10 +105,24 @@
           <h2>🛒 Pactes infernaux</h2>
           <p>Investis tes âmes pour devenir une menace.</p>
         </div>
+        <!-- Lancement / reprise (surtout utile sur mobile, entre deux vies) -->
+        <button id="run-control" class="run-control hidden"></button>
         <div id="shop-list"></div>
         <button id="options-btn" class="reset-btn">⚙️ Options &amp; sauvegarde</button>
       </aside>
     </main>
+
+    <!-- Barre d'onglets (mobile) : bascule entre jeu et boutique -->
+    <nav id="mobile-nav">
+      <div id="nav-timer" aria-hidden="true"><div id="nav-timer-fill"></div></div>
+      <button class="nav-btn active" data-view="game">
+        <span class="nav-ico">⚔️</span><span class="nav-lbl">Chaos</span>
+      </button>
+      <button class="nav-btn" data-view="shop">
+        <span class="nav-ico">🛒</span><span class="nav-lbl">Pouvoirs</span>
+        <span id="nav-shop-badge" class="nav-badge hidden"></span>
+      </button>
+    </nav>
 
     <!-- Menu Options / Sauvegarde (transfert entre appareils) -->
     <div id="menu" class="hidden">

@@ -17,6 +17,9 @@
   function resize() {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight;
+    // Le canevas peut être masqué (vue boutique sur mobile) : on ne recalcule
+    // rien tant qu'il n'a pas de dimensions valides.
+    if (w === 0 || h === 0) return;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     game.dpr = dpr;
