@@ -1,0 +1,50 @@
+name: Déploiement GitHub Pages
+
+# Déploie le jeu en ligne automatiquement à chaque push sur main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # permet aussi un déclenchement manuel
+
+# Droits nécessaires au déploiement Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement à la fois ; on annule celui en cours si un nouveau arrive.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Pages (auto-activation si possible)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Assemblage du site (jeu uniquement, sans fichiers de dev)
+        run: |
+          mkdir -p _site
+          rsync -a \
+            --exclude='.git' --exclude='.github' --exclude='_site' \
+            --exclude='README.md' --exclude='.gitignore' \
+            ./ _site/
+
+      - name: Préparation de l'artefact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Déploiement
+        id: deployment
+        uses: actions/deploy-pages@v4
