@@ -583,10 +583,13 @@ class UI {
     for (const def of owned) {
       const b = box.querySelector(`[data-id="${def.id}"]`);
       if (!b) continue;
+      const meta = ACTIVE_ABILITIES[def.id];
+      const used = meta && meta.once && g.abilityUsed[def.id];
       const cd = g.abilityCooldowns[def.id] || 0;
-      const ready = cd <= 0;
+      const ready = !used && cd <= 0;
       b.classList.toggle('ready', ready);
-      b.querySelector('.ab-cd').textContent = ready ? '' : Math.ceil(cd);
+      b.classList.toggle('used', !!used);
+      b.querySelector('.ab-cd').textContent = used ? '✓' : (ready ? '' : Math.ceil(cd));
     }
   }
 
