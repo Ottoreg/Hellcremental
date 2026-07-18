@@ -204,7 +204,8 @@ class Game {
     const node = SKILL_TREE.find(n => n.id === id);
     if (!node) return true;
     // Voies exclusives : choisir l'une verrouille les autres du même groupe.
-    if (node.group) {
+    // Le Serment du Chaos Absolu (pacte_libre) lève cette exclusivité.
+    if (node.group && this.upgradeLevel('pacte_libre') < 1) {
       const rival = SKILL_TREE.some(o =>
         o.group === node.group && o.id !== id && this.upgradeLevel(o.id) >= 1);
       if (rival) return false;
@@ -248,7 +249,7 @@ class Game {
       vagabond: 0, vagabondDmg: 0, vagabondSpeed: 0, stormling: 0,
       meteore: 0, huntPriests: 0,
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
-      foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0,
+      foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
