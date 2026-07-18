@@ -236,6 +236,8 @@ class Game {
       splash: 0, soulMult: 1, minions: 0, demolisher: 0,
       minionDmgBonus: 0, voieMagie: 0, voieLegion: 0, foudre: 0,
       voieClic: 0, fireWave: 0,
+      minionSpeed: 0, demoDmgBonus: 0, demoSpeed: 0,
+      vagabond: 0, vagabondDmg: 0, vagabondSpeed: 0, stormling: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -353,6 +355,8 @@ class Game {
     this.attackers.push(this.makeAttacker('demon'));
     for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker('minion'));
     if (this.stats.demolisher > 0) this.attackers.push(this.makeAttacker('demolisher'));
+    for (let i = 0; i < this.stats.vagabond; i++) this.attackers.push(this.makeAttacker('vagabond'));
+    for (let i = 0; i < this.stats.stormling; i++) this.attackers.push(this.makeAttacker('stormling'));
   }
 
   /* ---------------------- Sorts actifs ---------------------- */
@@ -386,18 +390,29 @@ class Game {
     }
   }
 
-  spawnLightning(t) {
-    this.bolts.push({ gx: t.gx, gy: t.gy, life: 0.35, seed: Math.random() * 1000 });
+  spawnLightning(t, small) {
+    this.bolts.push({ gx: t.gx, gy: t.gy, life: small ? 0.28 : 0.35, seed: Math.random() * 1000, small: !!small });
     const w = this.worldOf(t);
-    for (let i = 0; i < 14; i++) {
-      const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 130;
+    const count = small ? 7 : 14;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, sp = (small ? 25 : 40) + Math.random() * (small ? 70 : 130);
       this.particles.push({
         x: w.x, y: w.y - 14, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
-        g: 150, life: 0.35 + Math.random() * 0.3,
-        color: Math.random() < 0.5 ? '#cfefff' : '#ffffff', size: 2 + Math.random() * 2,
+        g: 150, life: 0.3 + Math.random() * 0.3,
+        color: Math.random() < 0.5 ? '#cfefff' : '#ffffff', size: (small ? 1.5 : 2) + Math.random() * 2,
       });
     }
-    this.addFloater(t.gx, t.gy, '⚡', '#cfefff');
+    if (!small) this.addFloater(t.gx, t.gy, '⚡', '#cfefff');
+  }
+
+  spawnPlagueParticle(a, radius) {
+    const ang = Math.random() * Math.PI * 2, r = Math.random() * radius;
+    const w = Iso.toScreen(a.gx + Math.cos(ang) * r, a.gy + Math.sin(ang) * r);
+    this.particles.push({
+      x: w.x, y: w.y - 8, vx: (Math.random() - 0.5) * 14, vy: -8 - Math.random() * 16,
+      g: -8, life: 0.6 + Math.random() * 0.5,
+      color: Math.random() < 0.5 ? '#7bd47b' : '#4a9d5a', size: 2 + Math.random() * 2,
+    });
   }
 
   spawnFireParticle(f) {
@@ -460,10 +475,13 @@ class Game {
 
   makeAttacker(kind) {
     const isDemon = kind === 'demon';
-    return {
+    const g = this.gridSize || 5;
+    const a = {
       kind,
       isDemon,
       isDemolisher: kind === 'demolisher',
+      isVagabond: kind === 'vagabond',
+      isStormling: kind === 'stormling',
       gx: isDemon ? 0.4 : Math.random() * 0.8,
       gy: isDemon ? 0.4 : Math.random() * 0.8,
       target: null,
@@ -471,6 +489,18 @@ class Game {
       bob: Math.random() * Math.PI * 2,
       lunge: 0,
     };
+    if (a.isVagabond) {
+      // Erre n'importe où sur la grille.
+      a.gx = Math.random() * g; a.gy = Math.random() * g;
+      a.wx = Math.random() * (g - 1); a.wy = Math.random() * (g - 1);
+      a.plagueTick = 0;
+    }
+    if (a.isStormling) {
+      // Immobile, posé quelque part sur la grille.
+      a.gx = Math.random() * (g - 1); a.gy = Math.random() * (g - 1);
+      a.cooldown = Math.random(); // décalage initial
+    }
+    return a;
   }
 
   /* ---------------------- Boucle de mise à jour ---------------------- */
@@ -515,6 +545,9 @@ class Game {
       a.bob += dt * 6;
       if (a.lunge > 0) a.lunge = Math.max(0, a.lunge - dt * 4);
 
+      if (a.isVagabond) { this.updateVagabond(a, dt, s); continue; }
+      if (a.isStormling) { this.updateStormling(a, dt, s); continue; }
+
       // (Re)cible si nécessaire.
       if (!a.target || a.target.dead) a.target = this.nearestTarget(a);
       if (!a.target) continue;
@@ -522,8 +555,10 @@ class Game {
       const t = a.target;
       const dx = t.gx - a.gx, dy = t.gy - a.gy;
       const dist = Math.hypot(dx, dy);
-      // Le Démolisseur est plus lent (c'est un colosse).
-      const spd = a.isDemolisher ? s.moveSpeed * 0.85 : s.moveSpeed;
+      // Vitesse : démon de base ; serviteurs et colosse ont leurs bonus.
+      let spd = s.moveSpeed;
+      if (a.isDemolisher) spd = s.moveSpeed * 0.85 * (1 + s.demoSpeed);
+      else if (!a.isDemon) spd = s.moveSpeed * (1 + s.minionSpeed);
       if (dist > 0.75) {
         // Se déplace vers la cible.
         const move = Math.min(spd * dt, dist);
@@ -542,6 +577,47 @@ class Game {
 
     // Progression : tout détruit -> niveau nettoyé.
     if (this.runDestroyed >= this.totalToDestroy) this.endRun(true);
+  }
+
+  /* Vagabond : erre au hasard et répand un nuage de peste (dégâts de zone). */
+  updateVagabond(a, dt, s) {
+    const spd = (s.moveSpeed * 0.55) * (1 + s.vagabondSpeed);
+    const dx = a.wx - a.gx, dy = a.wy - a.gy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.4) {
+      // Nouvelle destination aléatoire.
+      a.wx = Math.random() * (this.gridSize - 1);
+      a.wy = Math.random() * (this.gridSize - 1);
+    } else {
+      const move = Math.min(spd * dt, dist);
+      a.gx += (dx / dist) * move;
+      a.gy += (dy / dist) * move;
+    }
+    // Nuage de peste : dégâts continus autour du vagabond.
+    const radius = 1.3;
+    const dps = s.damage * 0.4 * (1 + s.vagabondDmg);
+    for (const t of this.targets) {
+      if (t.dead) continue;
+      if (Math.hypot(t.gx - a.gx, t.gy - a.gy) <= radius) {
+        t.hp -= dps * dt;
+        if (t.hp <= 0) this.destroyTarget(t);
+      }
+    }
+    a.plagueTick -= dt;
+    if (a.plagueTick <= 0) { a.plagueTick = 0.09; this.spawnPlagueParticle(a, radius); }
+  }
+
+  /* Foudroyeur : immobile, lance de petits éclairs sur des cibles au hasard. */
+  updateStormling(a, dt, s) {
+    a.cooldown -= dt;
+    if (a.cooldown > 0) return;
+    a.cooldown = 2.0;
+    const alive = this.targets.filter(t => !t.dead);
+    if (!alive.length) return;
+    const t = alive[Math.floor(Math.random() * alive.length)];
+    a.lunge = 1;
+    this.spawnLightning(t, true); // petit éclair
+    this.hitTarget(t, s.damage * 1.5, null);
   }
 
   nearestTarget(a) {
@@ -567,13 +643,12 @@ class Game {
   /* Dégâts d'un attaquant sur une cible donnée. */
   attackerDamage(a, t, s) {
     if (a.isDemon) return s.damage;
-    const legion = 1 + s.minionDmgBonus;      // Voie des Légions : serviteurs renforcés
     if (a.isDemolisher) {
       let dmg = s.damage * 2;                 // colosse : frappe lourde
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
-      return dmg * legion;
+      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus);
     }
-    return Math.max(1, s.damage * 0.5 * legion); // serviteur
+    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus)); // serviteur
   }
 
   hitTarget(t, dmg, source) {
@@ -805,6 +880,24 @@ class Game {
       ctx.fill();
     }
 
+    // --- Nuages de peste (autour des vagabonds, au sol) ---
+    for (const a of this.attackers) {
+      if (!a.isVagabond) continue;
+      const w = Iso.toScreen(a.gx, a.gy);
+      const p = cam.worldToScreen(w.x, w.y);
+      const R = 1.3 * CONFIG.TILE_W * 0.72 * cam.scale;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 130 + a.gx * 3);
+      const al = 0.3 + pulse * 0.14;
+      const grd = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, R);
+      grd.addColorStop(0, `rgba(120,200,120,${al})`);
+      grd.addColorStop(0.6, `rgba(70,140,80,${al * 0.5})`);
+      grd.addColorStop(1, 'rgba(30,70,40,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // --- Objets + attaquants triés par profondeur (gx+gy) ---
     const drawList = [];
     for (const t of this.targets) {
@@ -825,10 +918,10 @@ class Game {
       const w = Iso.toScreen(bolt.gx, bolt.gy);
       const base = cam.worldToScreen(w.x, w.y);
       const groundY = base.y - 14 * cam.scale;
-      const topY = groundY - 130 * cam.scale;
+      const topY = groundY - (bolt.small ? 78 : 130) * cam.scale;
       ctx.globalAlpha = Math.max(0, Math.min(1, bolt.life * 3.2));
       ctx.strokeStyle = '#e6f6ff';
-      ctx.lineWidth = 3 * cam.scale;
+      ctx.lineWidth = (bolt.small ? 2 : 3) * cam.scale;
       ctx.shadowColor = '#7fd0ff';
       ctx.shadowBlur = 14 * cam.scale;
       ctx.beginPath();
@@ -957,6 +1050,10 @@ class Game {
       ? { emoji: '😈', r: 21, esize: 30, ring: '#ff8a2a', fill: '#7a1810', glow: '255,90,20' }
       : a.isDemolisher
       ? { emoji: '👹', r: 28, esize: 40, ring: '#c07bff', fill: '#3d1257', glow: '160,70,230' }
+      : a.isVagabond
+      ? { emoji: '🧟', r: 18, esize: 26, ring: '#6fd08a', fill: '#1e3a24', glow: '110,200,120' }
+      : a.isStormling
+      ? { emoji: '🧙', r: 17, esize: 25, ring: '#7fd0ff', fill: '#16304a', glow: '120,200,255' }
       : { emoji: '👿', r: 15, esize: 22, ring: '#a86bff', fill: '#2c1442', glow: '150,90,255' };
 
     const bobY = Math.sin(a.bob) * 2.5 * scale;

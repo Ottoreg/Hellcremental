@@ -268,8 +268,8 @@ html, body {
     repeating-linear-gradient(45deg, #100809 0 24px, #130a0c 24px 48px);
 }
 #skilltree:active { cursor: grabbing; }
-#tree-world { position: absolute; top: 0; left: 0; width: 1200px; height: 860px; transform-origin: 0 0; will-change: transform; }
-#tree-links { position: absolute; top: 0; left: 0; width: 1200px; height: 860px; pointer-events: none; overflow: visible; }
+#tree-world { position: absolute; top: 0; left: 0; width: 1400px; height: 1140px; transform-origin: 0 0; will-change: transform; }
+#tree-links { position: absolute; top: 0; left: 0; width: 1400px; height: 1140px; pointer-events: none; overflow: visible; }
 #tree-links line { stroke: #4a2a2f; stroke-width: 3; }
 #tree-links line.lit { stroke: #7a3b18; }
 

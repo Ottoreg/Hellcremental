@@ -196,6 +196,72 @@ const UPGRADES = [
     effect: (n) => `+${Math.round(n * 25)}% de dégâts des serviteurs`,
     apply: (s, n) => { s.minionDmgBonus += 0.25 * n; },
   },
+
+  // --- Améliorations des serviteurs de base ---
+  {
+    id: 'minion_dmg', name: 'Serviteurs Brutaux', emoji: '⚔️',
+    desc: 'Tes esprits serviteurs frappent plus fort.',
+    baseCost: 500, mult: 1.45, max: 20,
+    effect: (n) => `+${Math.round(n * 20)}% de dégâts des serviteurs`,
+    apply: (s, n) => { s.minionDmgBonus += 0.2 * n; },
+  },
+  {
+    id: 'minion_speed', name: 'Serviteurs Agiles', emoji: '💨',
+    desc: 'Tes esprits serviteurs se déplacent plus vite.',
+    baseCost: 500, mult: 1.45, max: 20,
+    effect: (n) => `+${Math.round(n * 15)}% de vitesse des serviteurs`,
+    apply: (s, n) => { s.minionSpeed += 0.15 * n; },
+  },
+
+  // --- Améliorations du Colosse (Démolisseur) ---
+  {
+    id: 'demo_dmg', name: 'Colosse Enragé', emoji: '🔨',
+    desc: 'Le Démolisseur cogne encore plus fort.',
+    baseCost: 1500, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 30)}% de dégâts du Colosse`,
+    apply: (s, n) => { s.demoDmgBonus += 0.3 * n; },
+  },
+  {
+    id: 'demo_speed', name: 'Colosse Furieux', emoji: '🏃',
+    desc: 'Le Démolisseur se déplace plus vite.',
+    baseCost: 1500, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 15)}% de vitesse du Colosse`,
+    apply: (s, n) => { s.demoSpeed += 0.15 * n; },
+  },
+
+  // --- Vagabonds (après le Colosse) : errent et répandent la peste ---
+  {
+    id: 'vagabond', name: 'Serviteur Vagabond', emoji: '🧟',
+    desc: 'Invoque un vagabond qui erre au-dessus du niveau et répand un nuage ' +
+          'de peste, infligeant des dégâts de zone continus (jusqu\'à 3 vagabonds).',
+    baseCost: 4000, mult: 6, max: 3,
+    effect: (n) => `${n} vagabond${n > 1 ? 's' : ''} · nuage de peste`,
+    apply: (s, n) => { s.vagabond = n; },
+  },
+  {
+    id: 'vagabond_dmg', name: 'Peste Virulente', emoji: '🦠',
+    desc: 'Le nuage de peste des vagabonds ronge bien plus vite.',
+    baseCost: 3000, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 25)}% de dégâts de peste`,
+    apply: (s, n) => { s.vagabondDmg += 0.25 * n; },
+  },
+  {
+    id: 'vagabond_speed', name: 'Errance Fébrile', emoji: '👣',
+    desc: 'Les vagabonds errent plus vite et couvrent plus de terrain.',
+    baseCost: 3000, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 15)}% de vitesse d'errance`,
+    apply: (s, n) => { s.vagabondSpeed += 0.15 * n; },
+  },
+
+  // --- Foudroyeur (après les vagabonds) : immobile, petits éclairs ---
+  {
+    id: 'foudroyeur', name: 'Servant Foudroyeur', emoji: '🧙',
+    desc: 'Invoque un servant immobile qui lance sans cesse de petits éclairs ' +
+          'sur des cibles au hasard (jusqu\'à 2 foudroyeurs).',
+    baseCost: 8000, mult: 8, max: 2,
+    effect: (n) => `${n} foudroyeur${n > 1 ? 's' : ''} · petits éclairs`,
+    apply: (s, n) => { s.stormling = n; },
+  },
   {
     id: 'voie_clic', name: 'Voie du Clic Démoniaque', emoji: '🖐️',
     desc: 'Canalise ta rage dans ta griffe : tes clics deviennent dévastateurs. ' +
@@ -230,8 +296,8 @@ const ACTIVE_ABILITIES = {
  * Arbre de compétences : position (en coordonnées « monde ») de chaque pouvoir
  * et lien vers son parent. La vue se parcourt librement au drag.
  * ------------------------------------------------------------------------- */
-const TREE_W = 1200;
-const TREE_H = 860;
+const TREE_W = 1400;
+const TREE_H = 1140;
 const SKILL_TREE = [
   { id: 'root',        x: 560, y: 430 },                   // le démon (non achetable)
   { id: 'griffes',     x: 560, y: 260, parent: 'root' },
@@ -246,6 +312,18 @@ const SKILL_TREE = [
   { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
   { id: 'demolisseur', x: 940, y: 770, parent: 'minions', req: 8 },
+  // Améliorations des serviteurs de base.
+  { id: 'minion_dmg',   x: 1030, y: 545, parent: 'minions', req: 1 },
+  { id: 'minion_speed', x: 1090, y: 650, parent: 'minions', req: 1 },
+  // Améliorations du Colosse.
+  { id: 'demo_dmg',     x: 1130, y: 745, parent: 'demolisseur', req: 1 },
+  { id: 'demo_speed',   x: 1170, y: 855, parent: 'demolisseur', req: 1 },
+  // Vagabonds (après le Colosse) et leurs améliorations.
+  { id: 'vagabond',       x: 930, y: 930,  parent: 'demolisseur', req: 1 },
+  { id: 'vagabond_dmg',   x: 785, y: 985,  parent: 'vagabond', req: 1 },
+  { id: 'vagabond_speed', x: 1075, y: 990, parent: 'vagabond', req: 1 },
+  // Foudroyeur (après les vagabonds).
+  { id: 'foudroyeur',   x: 930, y: 1075, parent: 'vagabond', req: 1 },
 
   // Voie de la Magie (exclusive) — prolonge la branche du feu.
   { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
