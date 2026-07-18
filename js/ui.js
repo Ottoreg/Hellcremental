@@ -510,6 +510,9 @@ class UI {
 
     this.refreshAbilities();
 
+    // Niveau boss (tous les 10 niveaux) : on le met en évidence.
+    this.$('level').classList.toggle('boss', isBossLevel(g.level));
+
     const playing = g.phase === 'playing';
     if (playing) {
       const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
@@ -519,8 +522,13 @@ class UI {
       this.$('hud').classList.toggle('low', g.timeLeft <= 5);
       // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
       this.$('nav-timer-fill').style.width = (frac * 100) + '%';
+      // Indicateur de drainage par les prêtres.
+      const drain = g.priestDrain || 0;
+      this.$('hud-drain').classList.toggle('hidden', drain <= 0);
+      if (drain > 0) this.$('drain-text').textContent = 'exorcisme ×' + (1 + drain).toFixed(1);
     } else {
       this.$('nav-timer-fill').style.width = '100%';
+      this.$('hud-drain').classList.add('hidden');
     }
 
     // Fiche de pacte ouverte : on la garde à jour (coût/abordable).
