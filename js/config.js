@@ -162,7 +162,7 @@ const UPGRADES = [
   {
     id: 'voie_magie', name: 'Voie de la Magie', emoji: '🔮',
     desc: 'Embrasse les arcanes démoniaques et débloque des sorts dévastateurs. ' +
-          'Choix exclusif : verrouille définitivement la Voie des Légions.',
+          'Choix exclusif : verrouille définitivement toutes les autres voies.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : sorts magiques débloqués',
     apply: (s, n) => { s.voieMagie += n; },
@@ -193,7 +193,7 @@ const UPGRADES = [
   {
     id: 'voie_legion', name: 'Voie des Légions', emoji: '🎖️',
     desc: 'Commande une armée : tes serviteurs deviennent redoutables. ' +
-          'Choix exclusif : verrouille définitivement la Voie de la Magie.',
+          'Choix exclusif : verrouille définitivement toutes les autres voies.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : serviteurs renforcés débloqués',
     apply: (s, n) => { s.voieLegion += n; },
@@ -282,7 +282,7 @@ const UPGRADES = [
   {
     id: 'voie_clic', name: 'Voie du Clic Démoniaque', emoji: '🖐️',
     desc: 'Canalise ta rage dans ta griffe : tes clics deviennent dévastateurs. ' +
-          'Choix exclusif : verrouille définitivement les autres voies.',
+          'Choix exclusif : verrouille définitivement toutes les autres voies.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : clic démoniaque débloqué',
     apply: (s, n) => { s.voieClic += n; },
