@@ -99,9 +99,10 @@ const UPGRADES = [
     apply: (s, n) => { s.moveSpeed += 0.4 * n; },
   },
   {
+    // Bonus de survie plafonné à +40 s au total (max 10 niveaux × +4 s).
     id: 'longevite', name: 'Longévité Maudite', emoji: '⏳',
-    desc: 'Résiste plus longtemps avant d\'être exorcisé.',
-    baseCost: 22, mult: 1.4, max: 60,
+    desc: 'Résiste plus longtemps avant d\'être exorcisé (jusqu\'à +40 s).',
+    baseCost: 22, mult: 1.5, max: 10,
     effect: (n) => `+${4 * n}s de survie`,
     apply: (s, n) => { s.lifespan += 4 * n; },
   },
@@ -181,6 +182,29 @@ const UPGRADES = [
     effect: (n) => `+${Math.round(n * 25)}% de dégâts des serviteurs`,
     apply: (s, n) => { s.minionDmgBonus += 0.25 * n; },
   },
+  {
+    id: 'voie_clic', name: 'Voie du Clic Démoniaque', emoji: '🖐️',
+    desc: 'Canalise ta rage dans ta griffe : tes clics deviennent dévastateurs. ' +
+          'Choix exclusif : verrouille définitivement les autres voies.',
+    baseCost: 400, mult: 1, max: 1,
+    effect: () => 'Voie engagée : clic démoniaque débloqué',
+    apply: (s, n) => { s.voieClic += n; },
+  },
+  {
+    id: 'clic_demon', name: 'Poing Démoniaque', emoji: '👊',
+    desc: 'Décuple encore les dégâts de ton clic infernal.',
+    baseCost: 200, mult: 1.4, max: 40,
+    effect: (n) => `+${20 * n} dégâts au clic`,
+    apply: (s, n) => { s.clickDamage += 20 * n; },
+  },
+  {
+    id: 'nappe_feu', name: 'Nappe de Feu', emoji: '🌋',
+    desc: 'Ton clic embrase le sol : une nappe de flammes brûle les cibles ' +
+          'autour du point cliqué pendant quelques secondes.',
+    baseCost: 350, mult: 1.5, max: 20,
+    effect: (n) => `Brasier ${(3 + n * 0.3).toFixed(1)}s · dégâts de zone au clic`,
+    apply: (s, n) => { s.fireWave = n; },
+  },
 ];
 
 /* Attaque active : métadonnées (recharge). */
@@ -215,4 +239,9 @@ const SKILL_TREE = [
   // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
   { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
   { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
+
+  // Voie du Clic Démoniaque (exclusive) — prolonge la branche du clic.
+  { id: 'voie_clic',   x: 430, y: 65,  parent: 'cataclysme', req: 1, group: 'voie' },
+  { id: 'clic_demon',  x: 280, y: 55,  parent: 'voie_clic', req: 1 },
+  { id: 'nappe_feu',   x: 205, y: 170, parent: 'voie_clic', req: 1 },
 ];
