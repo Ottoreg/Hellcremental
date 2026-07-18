@@ -104,6 +104,10 @@ html, body {
 .hud-line b { font-family: 'Courier New', monospace; font-weight: bold; }
 #progress-text { color: var(--ember-2); }
 .hud-time b { color: var(--holy); }
+.hud-drain b { color: #cfe0ff; }
+.hud-drain .hud-ico { animation: pulseLow 1s ease-in-out infinite; }
+/* Niveau boss : le numéro de niveau brille en or. */
+#level.boss { color: var(--holy); text-shadow: 0 0 10px rgba(255,200,60,.8); }
 /* Derniers instants avant l'exorcisme : le compte à rebours s'affole. */
 #hud.low .hud-time b { color: var(--blood); animation: pulseLow .55s ease-in-out infinite; }
 @keyframes pulseLow { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }

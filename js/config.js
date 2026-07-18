@@ -40,7 +40,23 @@ const TARGET_TYPES = {
   eglise:     { name: 'Chapelle',     emoji: '⛪', hp: 120, value: 40, living: false },
   statue:     { name: 'Statue sainte',emoji: '🗿', hp: 160, value: 55, living: false },
   chevalier:  { name: 'Paladin',      emoji: '🛡️', hp: 90,  value: 45, living: true  },
+
+  // Prêtre : prie pour exorciser le démon plus vite (draine sa durée de vie).
+  pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true  },
+
+  // Boss (tous les 10 niveaux) : bien plus grands et coriaces.
+  boss_cathedrale: { name: 'Grande Cathédrale', emoji: '⛪', hp: 220, value: 140, living: false },
+  boss_forteresse: { name: 'Forteresse Sainte',  emoji: '🏰', hp: 260, value: 170, living: false },
+  boss_seraphin:   { name: 'Séraphin Vengeur',   emoji: '😇', hp: 190, value: 160, living: true  },
+  boss_colosse:    { name: 'Colosse Béni',       emoji: '🗽', hp: 300, value: 150, living: false },
 };
+
+/* Réglages boss & prêtres. */
+const BOSS_POOL = ['boss_cathedrale', 'boss_forteresse', 'boss_seraphin', 'boss_colosse'];
+const BOSS_HP_FACTOR = 4;   // multiplicateur de PV supplémentaire du boss
+const BOSS_SCALE = 2.1;     // taille visuelle du boss
+const PRIEST_DRAIN = 0.3;   // chaque prêtre accélère l'exorcisme de +30%
+function isBossLevel(level) { return level % 10 === 0; }
 
 /* -------------------------------------------------------------------------
  * Palettes de niveaux : quels types apparaissent, et à quelle fréquence.

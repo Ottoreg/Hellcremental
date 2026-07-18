@@ -31,6 +31,7 @@ class Game {
     this.floaters = [];        // textes flottants (+âmes)
     this.bolts = [];           // éclairs (sort Foudre)
     this.abilityCooldowns = {}; // recharge des sorts actifs
+    this.priestDrain = 0;      // accélération d'exorcisme due aux prêtres
     this.runDestroyed = 0;
     this.runSouls = 0;
     this.totalToDestroy = 0;
@@ -265,23 +266,48 @@ class Game {
     const hpMult = 1 + (level - 1) * 0.35;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
+    const boss = isBossLevel(level);
+    const nPriests = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
 
     // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
     // de cibles — le résultat reste identique sur tous les appareils.
     for (let attempt = 0; attempt < 12; attempt++) {
       const rand = seededRandom(this.seed, level, attempt);
       const size = Math.min(CONFIG.GRID_MAX, CONFIG.GRID_MIN + Math.floor((level - 1) / 2));
+      const used = new Set();
       const targets = [];
+      const push = (x, y, typeId, hpFactor, valFactor) => {
+        const def = TARGET_TYPES[typeId];
+        const hp = Math.ceil(def.hp * hpMult * (hpFactor || 1));
+        targets.push({ gx: x, gy: y, typeId, hp, maxHp: hp, value: Math.ceil(def.value * valMult * (valFactor || 1)) });
+        used.add(x + ',' + y);
+      };
+
+      // Boss au centre (tous les 10 niveaux).
+      if (boss) {
+        const bid = BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
+        push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
+      }
+
+      // Prêtres sur des cases libres.
+      let placed = 0, guard = 0;
+      while (placed < nPriests && guard++ < size * size * 3) {
+        const x = Math.floor(rand() * size), y = Math.floor(rand() * size);
+        if ((x <= 1 && y <= 1) || used.has(x + ',' + y)) continue;
+        push(x, y, 'pretre', 1.3, 1);
+        placed++;
+      }
+
+      // Cibles ordinaires sur le reste de la grille.
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
+          if (used.has(x + ',' + y)) continue;
           if (rand() > density) continue;
           if (x <= 1 && y <= 1) continue; // coin libre pour l'apparition du démon
-          const typeId = pool[Math.floor(rand() * pool.length)];
-          const def = TARGET_TYPES[typeId];
-          const hp = Math.ceil(def.hp * hpMult);
-          targets.push({ gx: x, gy: y, typeId, hp, maxHp: hp, value: Math.ceil(def.value * valMult) });
+          push(x, y, pool[Math.floor(rand() * pool.length)], 1, 1);
         }
       }
+
       if (targets.length >= 3) return { gridSize: size, targets };
     }
     // Repli extrêmement improbable.
@@ -300,11 +326,17 @@ class Game {
     if (scorched) for (const [x, y] of scorched)
       if (this.grid[y] && this.grid[y][x]) this.grid[y][x].scorched = true;
 
-    this.targets = rawTargets.map(t => ({
-      gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
-      hp: t.hp, maxHp: t.maxHp, value: t.value,
-      bob: Math.random() * Math.PI * 2, shake: 0, dead: false, deathT: 0,
-    }));
+    this.targets = rawTargets.map(t => {
+      const priest = t.typeId === 'pretre';
+      const boss = typeof t.typeId === 'string' && t.typeId.startsWith('boss_');
+      return {
+        gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
+        hp: t.hp, maxHp: t.maxHp, value: t.value,
+        priest, drain: priest ? PRIEST_DRAIN : 0,
+        boss, scale: boss ? BOSS_SCALE : 1,
+        bob: Math.random() * Math.PI * 2, shake: 0, dead: false, deathT: 0,
+      };
+    });
     for (const t of this.targets)
       if (this.grid[t.gy] && this.grid[t.gy][t.gx]) this.grid[t.gy][t.gx].occupied = true;
 
@@ -434,7 +466,11 @@ class Game {
     // Sur la vue boutique, le jeu est gelé : ni chrono, ni démon.
     if (this.paused) return;
 
-    this.timeLeft -= dt;
+    // Les prêtres encore vivants accélèrent l'exorcisme (drainent la survie).
+    let drain = 0;
+    for (const t of this.targets) if (!t.dead && t.priest) drain += t.drain;
+    this.priestDrain = drain;
+    this.timeLeft -= dt * (1 + drain);
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
     this.throttledSave(dt); // persiste régulièrement la partie en cours
 
@@ -780,7 +816,9 @@ class Game {
     const w = Iso.toScreen(t.gx, t.gy);
     const p = this.cam.worldToScreen(w.x, w.y);
     const scale = this.cam.scale;
-    const size = Math.round(30 * scale);
+    const ts = t.scale || 1;                 // facteur de taille (boss = plus grand)
+    const size = Math.round(30 * ts * scale);
+    const lift = (14 + (ts - 1) * 16) * scale; // les gros objets flottent plus haut
 
     if (t.dead) {
       // Effet de destruction : rétrécit et s'estompe.
@@ -795,26 +833,45 @@ class Game {
 
     const shakeX = t.shake > 0 ? (Math.random() - 0.5) * 6 * scale : 0;
     const bobY = Math.sin(t.bob) * 2 * scale;
+    const cy = p.y - lift + bobY;
 
-    // Ombre.
+    // Ombre (plus large pour les gros).
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 2 * scale, 14 * scale, 6 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + 2 * scale, 14 * ts * scale, 6 * ts * scale, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Aura dorée du boss / halo blanc du prêtre.
+    if (t.boss || t.priest) {
+      const rad = (t.boss ? 40 : 18) * scale;
+      const col = t.boss ? '255,200,60' : '210,230,255';
+      const g = ctx.createRadialGradient(p.x, cy, rad * 0.2, p.x, cy, rad);
+      g.addColorStop(0, `rgba(${col},${t.boss ? 0.4 : 0.5})`);
+      g.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x, cy, rad, 0, Math.PI * 2); ctx.fill();
+    }
 
     ctx.font = `${size}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(t.def.emoji, p.x + shakeX, p.y - 14 * scale + bobY);
+    ctx.fillText(t.def.emoji, p.x + shakeX, cy);
 
-    // Barre de vie si endommagé.
-    if (t.hp < t.maxHp) {
-      const bw = 26 * scale, bh = 4 * scale;
-      const bx = p.x - bw / 2, by = p.y - 34 * scale;
+    // Barre de vie (toujours visible pour le boss).
+    if (t.hp < t.maxHp || t.boss) {
+      const bw = (t.boss ? 46 : 26) * scale, bh = (t.boss ? 6 : 4) * scale;
+      const bx = p.x - bw / 2, by = cy - (size * 0.62) - 6 * scale;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(bx, by, bw, bh);
       const frac = Math.max(0, t.hp / t.maxHp);
       ctx.fillStyle = frac > 0.5 ? '#7bd47b' : frac > 0.25 ? '#ffcc4d' : '#ff5c5c';
       ctx.fillRect(bx, by, bw * frac, bh);
+      if (t.boss) {
+        ctx.strokeStyle = '#ffc83c'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh);
+        // Nom du boss.
+        ctx.font = `bold ${Math.round(11 * scale)}px Georgia, serif`;
+        ctx.fillStyle = '#ffe08a';
+        ctx.fillText(t.def.name, p.x, by - 8 * scale);
+      }
     }
   }
 
