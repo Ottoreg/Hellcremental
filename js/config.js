@@ -186,6 +186,13 @@ const UPGRADES = [
     apply: (s, n) => { s.foudre = n; },
   },
   {
+    id: 'foudre_dmg', name: 'Foudre Dévastatrice', emoji: '🌩️',
+    desc: 'Surcharge ta Foudre Infernale : chaque frappe inflige bien plus de dégâts.',
+    baseCost: 800, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 30)}% de dégâts de la Foudre`,
+    apply: (s, n) => { s.foudreDmg += 0.3 * n; },
+  },
+  {
     id: 'pyromancie', name: 'Pyromancie', emoji: '🔥',
     desc: 'Tes flammes se propagent plus violemment aux cibles adjacentes.',
     baseCost: 300, mult: 1.5, max: 20,
@@ -370,6 +377,16 @@ const UPGRADES = [
     effect: (n) => `Brasier ${(3 + n * 0.3).toFixed(1)}s · dégâts de zone au clic`,
     apply: (s, n) => { s.fireWave = n; },
   },
+  {
+    id: 'finisher', name: 'Damnation Finale', emoji: '👹', active: true,
+    desc: 'Sort ACTIF (une seule fois par niveau) : bannis TOUS tes serviteurs ' +
+          'pour le reste du niveau et, en échange, ta griffe entre en furie ' +
+          'pendant 10 s — dégâts de clic décuplés et frappe en zone. Un vrai ' +
+          'finisher pour tout raser toi-même.',
+    baseCost: 40000, mult: 1.7, max: 8,
+    effect: (n) => `Furie 10 s · clic ×${6 + n * 2} · zone ${1 + Math.min(2, Math.floor(n / 2))} case(s) · 1×/niveau`,
+    apply: (s, n) => { s.finisher = n; },
+  },
 ];
 
 /* Attaques actives : métadonnées (recharge ; `once` = une seule fois par niveau). */
@@ -377,6 +394,7 @@ const ACTIVE_ABILITIES = {
   foudre: { cooldown: (lvl) => Math.max(4, 14 - lvl) },
   meteore: { cooldown: (lvl) => Math.max(8, 20 - lvl) },
   flammes_noires: { cooldown: () => 0, once: true },
+  finisher: { cooldown: () => 0, once: true },
 };
 
 /* -------------------------------------------------------------------------
@@ -418,10 +436,13 @@ const SKILL_TREE = [
   { id: 'foudroyeur_dmg',   x: 770,  y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
   { id: 'foudroyeur_rate',  x: 1090, y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
   { id: 'foudroyeur_trait', x: 930,  y: 1245, parent: 'foudroyeur', req: 1 },
+  // Trait des Esprits Serviteurs : traque des prêtres (disponible sans voie).
+  { id: 'chasse_pretres', x: 740, y: 560, parent: 'minions', req: 1 },
 
   // Voie de la Magie (exclusive) — prolonge la branche du feu.
   { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
   { id: 'foudre',      x: 1110, y: 95, parent: 'voie_magie', req: 1 },
+  { id: 'foudre_dmg',  x: 1250, y: 180, parent: 'foudre', req: 1 },
   { id: 'pyromancie',  x: 1110, y: 245, parent: 'voie_magie', req: 1 },
   { id: 'meteore',     x: 1270, y: 60, parent: 'foudre', req: 1 },
   { id: 'meteore_zone',x: 1420, y: 120, parent: 'meteore', req: 1 },
@@ -430,10 +451,10 @@ const SKILL_TREE = [
   // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
   { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
   { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
-  { id: 'chasse_pretres', x: 425, y: 860, parent: 'legion_force', req: 1 },
 
   // Voie du Clic Démoniaque (exclusive) — prolonge la branche du clic.
   { id: 'voie_clic',   x: 430, y: 65,  parent: 'cataclysme', req: 1, group: 'voie' },
   { id: 'clic_demon',  x: 280, y: 55,  parent: 'voie_clic', req: 1 },
   { id: 'nappe_feu',   x: 205, y: 170, parent: 'voie_clic', req: 1 },
+  { id: 'finisher',    x: 140, y: 75,  parent: 'clic_demon', req: 1 },
 ];
