@@ -130,7 +130,7 @@ const UPGRADES = [
   {
     id: 'cataclysme', name: 'Clic Cataclysmique', emoji: '☄️',
     desc: 'Ton clic frappe plus fort la cible visée.',
-    baseCost: 15, mult: 1.35, max: 50,
+    baseCost: 45, mult: 1.35, max: 50,
     effect: (n) => `+${6 * n} dégâts au clic`,
     apply: (s, n) => { s.clickDamage += 6 * n; },
   },
@@ -193,7 +193,7 @@ const UPGRADES = [
   {
     id: 'clic_demon', name: 'Poing Démoniaque', emoji: '👊',
     desc: 'Décuple encore les dégâts de ton clic infernal.',
-    baseCost: 200, mult: 1.4, max: 40,
+    baseCost: 600, mult: 1.4, max: 40,
     effect: (n) => `+${20 * n} dégâts au clic`,
     apply: (s, n) => { s.clickDamage += 20 * n; },
   },
