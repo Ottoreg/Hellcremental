@@ -37,6 +37,9 @@ class Game {
     this.blackfireSet = new Set();
     this.blackfireSpread = 0;
     this.arc = null;           // arc permanent entre foudroyeurs
+    this.clickBuff = 0;        // furie de clic (Damnation Finale) : secondes restantes
+    this.clickBuffMult = 1;    // multiplicateur de dégâts de clic pendant la furie
+    this.clickBuffRadius = 0;  // rayon de la frappe de clic en zone pendant la furie
     this.abilityCooldowns = {}; // recharge des sorts actifs
     this.abilityUsed = {};     // sorts « une fois par niveau » déjà utilisés
     this.priestDrain = 0;      // accélération d'exorcisme due aux prêtres
@@ -250,6 +253,7 @@ class Game {
       meteore: 0, huntPriests: 0,
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
+      foudreDmg: 0, finisher: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -369,6 +373,9 @@ class Game {
     this.blackfireSet = new Set();
     this.blackfireSpread = 0;
     this.arc = null;
+    this.clickBuff = 0;
+    this.clickBuffMult = 1;
+    this.clickBuffRadius = 0;
     this.abilityCooldowns = {};
     this.abilityUsed = {};
     this.attackers = [];
@@ -397,6 +404,7 @@ class Game {
     if (id === 'foudre') this.castFoudre();
     else if (id === 'meteore') this.castMeteore();
     else if (id === 'flammes_noires') this.castBlackfire();
+    else if (id === 'finisher') this.castFinisher();
     const meta = ACTIVE_ABILITIES[id];
     if (meta && meta.once) this.abilityUsed[id] = true;
     else this.abilityCooldowns[id] = this.abilityCooldownMax(id);
@@ -444,6 +452,37 @@ class Game {
     this.blackfires.push({ gx: x, gy: y, anim: Math.random() * 6 });
   }
 
+  /* Damnation Finale : bannit tous les serviteurs pour le niveau et déclenche
+     une furie de clic (dégâts décuplés + frappe en zone) pendant 10 s. */
+  castFinisher() {
+    const s = this.stats;
+    const n = Math.max(1, s.finisher);
+    // Bannit tout ce qui n'est pas le démon (esprits, colosse, vagabonds, foudroyeurs).
+    const demon = this.attackers[0];
+    let banished = 0;
+    for (const a of this.attackers) {
+      if (a.isDemon) continue;
+      banished++;
+      const w = this.worldOf(a);
+      for (let i = 0; i < 8; i++) {
+        const ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 90;
+        this.particles.push({
+          x: w.x, y: w.y - 14, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 30,
+          g: 120, life: 0.4 + Math.random() * 0.4,
+          color: Math.random() < 0.5 ? '#c1121f' : '#5a1030', size: 2 + Math.random() * 2,
+        });
+      }
+    }
+    this.attackers = [demon];
+    this.arc = null; // plus de foudroyeurs -> plus d'arc
+    // Furie de clic : décuple les dégâts et frappe en zone pendant 10 s.
+    this.clickBuff = 10;
+    this.clickBuffMult = 6 + n * 2;
+    this.clickBuffRadius = 1 + Math.min(2, Math.floor(n / 2));
+    if (demon) { demon.lunge = 1; this.addFloater(demon.gx, demon.gy, '👹 FUREUR', '#ff3b3b'); }
+    if (banished) this.onChange(); // met à jour l'affichage (nb de serviteurs)
+  }
+
   spawnMeteor(gx, gy, rad) {
     this.impacts.push({ gx, gy, life: 0.6, max: 0.6, rad: rad || 1 });
     const w = Iso.toScreen(gx, gy);
@@ -464,7 +503,7 @@ class Game {
     const s = this.stats;
     const n = Math.max(1, s.foudre);
     const strikes = 2 + n;
-    const dmg = Math.round(s.damage * (4 + n * 1.5));
+    const dmg = Math.round(s.damage * (4 + n * 1.5) * (1 + s.foudreDmg));
     const alive = this.targets.filter(t => !t.dead);
     for (let i = 0; i < strikes && alive.length; i++) {
       const idx = Math.floor(Math.random() * alive.length);
@@ -606,6 +645,9 @@ class Game {
     // Recharge des sorts actifs.
     for (const k in this.abilityCooldowns)
       if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt);
+
+    // Furie de clic (Damnation Finale) : décompte des 10 s.
+    if (this.clickBuff > 0) this.clickBuff = Math.max(0, this.clickBuff - dt);
 
     // Nappes de feu (Voie du Clic) : dégâts de zone continus.
     if (this.fireCooldown > 0) this.fireCooldown = Math.max(0, this.fireCooldown - dt);
@@ -886,10 +928,23 @@ class Game {
     if (!s.clickUnlocked) return; // clic non débloqué (pacte Clic Cataclysmique)
     const t = this.targetAtScreen(sx, sy);
     if (t) {
+      // Furie de clic (Damnation Finale) : dégâts décuplés + frappe en zone.
+      const buffed = this.clickBuff > 0;
+      const dmg = buffed ? s.clickDamage * this.clickBuffMult : s.clickDamage;
       // Redirige le démon et inflige des dégâts de clic.
       this.attackers[0].target = t;
-      this.hitTarget(t, s.clickDamage, this.attackers[0]);
+      this.hitTarget(t, dmg, this.attackers[0]);
       this.spawnClickBurst(t);
+      if (buffed) {
+        const R = this.clickBuffRadius;
+        for (const o of this.targets) {
+          if (o.dead || o === t) continue;
+          if (Math.abs(o.gx - t.gx) <= R && Math.abs(o.gy - t.gy) <= R) {
+            o.shake = 0.25;
+            this.hitTarget(o, dmg, this.attackers[0]);
+          }
+        }
+      }
     }
     // Voie du Clic : une nappe de feu s'embrase à l'endroit du clic.
     if (s.fireWave > 0 && this.fireCooldown <= 0) {
