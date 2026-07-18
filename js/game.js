@@ -690,8 +690,12 @@ class Game {
           a.cooldown = s.attackInterval;
           a.lunge = 1;
           // Choc Sismique : premier coup du Colosse sur un bâtiment -> onde de choc.
-          if (a.isDemolisher && s.demoTrait && !t.def.living && t.hp >= t.maxHp)
+          // On marque le bâtiment pour que l'onde parte à CHAQUE nouveau bâtiment
+          // frappé, même s'il a déjà été entamé par d'autres attaques.
+          if (a.isDemolisher && s.demoTrait && !t.def.living && !t.demoStruck) {
+            t.demoStruck = true;
             this.demolisherShockwave(t, s);
+          }
           this.hitTarget(t, this.attackerDamage(a, t, s), a);
         }
       }
