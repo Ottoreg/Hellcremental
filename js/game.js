@@ -30,6 +30,8 @@ class Game {
     this.particles = [];
     this.floaters = [];        // textes flottants (+âmes)
     this.bolts = [];           // éclairs (sort Foudre)
+    this.fires = [];           // nappes de feu (Voie du Clic)
+    this.fireCooldown = 0;     // anti-spam des nappes de feu
     this.abilityCooldowns = {}; // recharge des sorts actifs
     this.priestDrain = 0;      // accélération d'exorcisme due aux prêtres
     this.runDestroyed = 0;
@@ -233,11 +235,14 @@ class Game {
       clickDamage: CONFIG.BASE_CLICK_DAMAGE,
       splash: 0, soulMult: 1, minions: 0, demolisher: 0,
       minionDmgBonus: 0, voieMagie: 0, voieLegion: 0, foudre: 0,
+      voieClic: 0, fireWave: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
       if (n > 0) def.apply(s, n);
     }
+    // Plafond du bonus de durée de partie : +40 s maximum.
+    s.lifespan = Math.min(s.lifespan, CONFIG.BASE_LIFESPAN + 40);
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
     this.stats = s;
     if (resetLifespan) this.timeLeft = s.lifespan;
@@ -343,6 +348,8 @@ class Game {
     this.particles = [];
     this.floaters = [];
     this.bolts = [];
+    this.fires = [];
+    this.fireCooldown = 0;
     this.abilityCooldowns = {};
     this.attackers = [];
     this.attackers.push(this.makeAttacker('demon'));
@@ -393,6 +400,16 @@ class Game {
       });
     }
     this.addFloater(t.gx, t.gy, '⚡', '#cfefff');
+  }
+
+  spawnFireParticle(f) {
+    const ang = Math.random() * Math.PI * 2, r = Math.random() * f.radius;
+    const w = Iso.toScreen(f.gx + Math.cos(ang) * r, f.gy + Math.sin(ang) * r);
+    this.particles.push({
+      x: w.x, y: w.y - 6, vx: (Math.random() - 0.5) * 22, vy: -28 - Math.random() * 40,
+      g: -30, life: 0.5 + Math.random() * 0.4,
+      color: Math.random() < 0.5 ? '#ff7b00' : '#ffd24d', size: 2 + Math.random() * 2,
+    });
   }
 
   /* Démarre une nouvelle vie sur le niveau courant (niveau frais). */
@@ -477,6 +494,23 @@ class Game {
     // Recharge des sorts actifs.
     for (const k in this.abilityCooldowns)
       if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt);
+
+    // Nappes de feu (Voie du Clic) : dégâts de zone continus.
+    if (this.fireCooldown > 0) this.fireCooldown = Math.max(0, this.fireCooldown - dt);
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i];
+      f.life -= dt;
+      for (const t of this.targets) {
+        if (t.dead) continue;
+        if (Math.hypot(t.gx - f.gx, t.gy - f.gy) <= f.radius) {
+          t.hp -= f.dps * dt;
+          if (t.hp <= 0) this.destroyTarget(t);
+        }
+      }
+      f.tick -= dt;
+      if (f.tick <= 0) { f.tick = 0.07; this.spawnFireParticle(f); }
+      if (f.life <= 0) this.fires.splice(i, 1);
+    }
 
     const s = this.stats;
     for (const a of this.attackers) {
@@ -584,13 +618,36 @@ class Game {
 
   /* Clic infernal du joueur sur une case. */
   clickAt(sx, sy) {
-    if (this.phase !== 'playing') return;
+    if (this.phase !== 'playing' || this.paused) return;
+    const s = this.stats;
     const t = this.targetAtScreen(sx, sy);
-    if (!t) return;
-    // Redirige le démon et inflige des dégâts de clic.
-    this.attackers[0].target = t;
-    this.hitTarget(t, this.stats.clickDamage, this.attackers[0]);
-    this.spawnClickBurst(t);
+    if (t) {
+      // Redirige le démon et inflige des dégâts de clic.
+      this.attackers[0].target = t;
+      this.hitTarget(t, s.clickDamage, this.attackers[0]);
+      this.spawnClickBurst(t);
+    }
+    // Voie du Clic : une nappe de feu s'embrase à l'endroit du clic.
+    if (s.fireWave > 0 && this.fireCooldown <= 0) {
+      const w = this.cam.screenToWorld(sx, sy);
+      const g = Iso.toGrid(w.x, w.y);
+      const gx = Math.max(0, Math.min(this.gridSize - 1, Math.round(g.gx)));
+      const gy = Math.max(0, Math.min(this.gridSize - 1, Math.round(g.gy)));
+      this.spawnFire(gx, gy);
+      this.fireCooldown = Math.max(0.6, 1.5 - s.fireWave * 0.05);
+    }
+  }
+
+  spawnFire(gx, gy) {
+    const n = this.stats.fireWave;
+    this.fires.push({
+      gx, gy,
+      radius: 1.1 + n * 0.03,
+      dps: this.stats.clickDamage * (0.5 + 0.15 * n),
+      life: 3 + n * 0.3,
+      tick: 0,
+    });
+    this.addFloater(gx, gy, '🔥', '#ff8a2a');
   }
 
   targetAtScreen(sx, sy) {
@@ -731,6 +788,23 @@ class Game {
         this.diamondScaled(ctx, p.x, p.y, fill, 'rgba(0,0,0,0.25)');
         if (hovered) this.diamondScaled(ctx, p.x, p.y, 'rgba(168,85,247,0.28)', '#a855f7');
       }
+    }
+
+    // --- Nappes de feu (au sol, sous les objets) ---
+    for (const f of this.fires) {
+      const w = Iso.toScreen(f.gx, f.gy);
+      const p = cam.worldToScreen(w.x, w.y);
+      const R = f.radius * CONFIG.TILE_W * 0.62 * cam.scale;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 110 + f.gx * 2);
+      const a = Math.min(1, f.life) * (0.35 + pulse * 0.18);
+      const grd = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, R);
+      grd.addColorStop(0, `rgba(255,150,20,${a})`);
+      grd.addColorStop(0.55, `rgba(220,60,10,${a * 0.55})`);
+      grd.addColorStop(1, 'rgba(120,20,0,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // --- Objets + attaquants triés par profondeur (gx+gy) ---
