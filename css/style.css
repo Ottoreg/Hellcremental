@@ -108,6 +108,37 @@ html, body {
 #hud.low .hud-time b { color: var(--blood); animation: pulseLow .55s ease-in-out infinite; }
 @keyframes pulseLow { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
+/* Sorts actifs : boutons en bas à gauche de l'écran de jeu. */
+#abilities {
+  position: absolute; z-index: 3; display: flex; gap: 10px;
+  bottom: 14px; left: max(16px, calc(env(safe-area-inset-left) + 10px));
+}
+#abilities:empty { display: none; }
+.ability-btn {
+  position: relative; width: 58px; height: 58px; border-radius: 14px; cursor: pointer;
+  background: radial-gradient(circle at 50% 35%, #2a1530, #140a18);
+  border: 2px solid #6a4a8a; color: #fff; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .1s, box-shadow .2s, border-color .2s;
+}
+.ability-btn .ab-emoji { font-size: 28px; line-height: 1; }
+.ability-btn.ready {
+  border-color: #7fd0ff;
+  box-shadow: 0 0 16px rgba(120,200,255,.55), 0 0 0 1px rgba(120,200,255,.4) inset;
+  animation: abReady 1.4s ease-in-out infinite;
+}
+.ability-btn.ready:active { transform: scale(.92); }
+.ability-btn.cast { transform: scale(.85); }
+/* Voile de recharge + secondes restantes. */
+.ability-btn:not(.ready) { filter: grayscale(.5) brightness(.8); }
+.ability-btn .ab-cd {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(8,4,10,.55); font-weight: bold; font-size: 18px;
+  font-variant-numeric: tabular-nums; color: #cfe8ff;
+}
+.ability-btn.ready .ab-cd { display: none; }
+@keyframes abReady { 0%,100% { box-shadow: 0 0 16px rgba(120,200,255,.5); } 50% { box-shadow: 0 0 24px rgba(120,200,255,.85); } }
+
 /* ---------------- Écran de démarrage / Overlay ---------------- */
 #start-screen, #overlay {
   position: absolute; inset: 0; z-index: 6;
@@ -233,8 +264,8 @@ html, body {
     repeating-linear-gradient(45deg, #100809 0 24px, #130a0c 24px 48px);
 }
 #skilltree:active { cursor: grabbing; }
-#tree-world { position: absolute; top: 0; left: 0; width: 1000px; height: 820px; transform-origin: 0 0; will-change: transform; }
-#tree-links { position: absolute; top: 0; left: 0; width: 1000px; height: 820px; pointer-events: none; overflow: visible; }
+#tree-world { position: absolute; top: 0; left: 0; width: 1200px; height: 860px; transform-origin: 0 0; will-change: transform; }
+#tree-links { position: absolute; top: 0; left: 0; width: 1200px; height: 860px; pointer-events: none; overflow: visible; }
 #tree-links line { stroke: #4a2a2f; stroke-width: 3; }
 #tree-links line.lit { stroke: #7a3b18; }
 
