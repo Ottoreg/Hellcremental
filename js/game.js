@@ -635,7 +635,7 @@ class Game {
     }
     // Nuage de peste : dégâts continus autour du vagabond.
     const radius = 1.3;
-    const dps = s.damage * 0.4 * (1 + s.vagabondDmg);
+    const dps = s.damage * 2.0 * (1 + s.vagabondDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (Math.hypot(t.gx - a.gx, t.gy - a.gy) <= radius) {
@@ -657,7 +657,7 @@ class Game {
     const t = alive[Math.floor(Math.random() * alive.length)];
     a.lunge = 1;
     this.spawnLightning(t, true); // petit éclair
-    this.hitTarget(t, s.damage * 1.5, null);
+    this.hitTarget(t, s.damage * 7.5, null);
   }
 
   nearestTarget(a) {
