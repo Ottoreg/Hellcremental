@@ -29,6 +29,8 @@ class Game {
     this.attackers = [];       // démon + serviteurs
     this.particles = [];
     this.floaters = [];        // textes flottants (+âmes)
+    this.bolts = [];           // éclairs (sort Foudre)
+    this.abilityCooldowns = {}; // recharge des sorts actifs
     this.runDestroyed = 0;
     this.runSouls = 0;
     this.totalToDestroy = 0;
@@ -187,11 +189,18 @@ class Game {
     return node ? node.parent : null;
   }
 
-  /* Un pacte est débloqué si sa branche part du démon, ou si son parent a
-   * atteint le niveau requis (1 par défaut, davantage pour certains pactes). */
+  /* Un pacte est débloqué si sa branche part du démon, si son parent a atteint
+   * le niveau requis, ET si aucune voie rivale exclusive n'a déjà été choisie. */
   isUnlocked(id) {
     const node = SKILL_TREE.find(n => n.id === id);
-    const parent = node && node.parent;
+    if (!node) return true;
+    // Voies exclusives : choisir l'une verrouille les autres du même groupe.
+    if (node.group) {
+      const rival = SKILL_TREE.some(o =>
+        o.group === node.group && o.id !== id && this.upgradeLevel(o.id) >= 1);
+      if (rival) return false;
+    }
+    const parent = node.parent;
     if (!parent || parent === 'root') return true;
     return this.upgradeLevel(parent) >= (node.req || 1);
   }
@@ -222,6 +231,7 @@ class Game {
       lifespan: CONFIG.BASE_LIFESPAN,
       clickDamage: CONFIG.BASE_CLICK_DAMAGE,
       splash: 0, soulMult: 1, minions: 0, demolisher: 0,
+      minionDmgBonus: 0, voieMagie: 0, voieLegion: 0, foudre: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -300,10 +310,57 @@ class Game {
 
     this.particles = [];
     this.floaters = [];
+    this.bolts = [];
+    this.abilityCooldowns = {};
     this.attackers = [];
     this.attackers.push(this.makeAttacker('demon'));
     for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker('minion'));
     if (this.stats.demolisher > 0) this.attackers.push(this.makeAttacker('demolisher'));
+  }
+
+  /* ---------------------- Sorts actifs ---------------------- */
+  abilityCooldownMax(id) {
+    const a = ACTIVE_ABILITIES[id];
+    return a ? a.cooldown(this.upgradeLevel(id)) : 10;
+  }
+  abilityReady(id) { return (this.abilityCooldowns[id] || 0) <= 0; }
+
+  /* Déclenche un sort actif (renvoie true si lancé). */
+  activateAbility(id) {
+    if (this.phase !== 'playing' || this.paused) return false;
+    if (this.upgradeLevel(id) <= 0 || !this.abilityReady(id)) return false;
+    if (id === 'foudre') this.castFoudre();
+    this.abilityCooldowns[id] = this.abilityCooldownMax(id);
+    return true;
+  }
+
+  /* Foudre : frappe plusieurs cases occupées au hasard pour de lourds dégâts. */
+  castFoudre() {
+    const s = this.stats;
+    const n = Math.max(1, s.foudre);
+    const strikes = 2 + n;
+    const dmg = Math.round(s.damage * (4 + n * 1.5));
+    const alive = this.targets.filter(t => !t.dead);
+    for (let i = 0; i < strikes && alive.length; i++) {
+      const idx = Math.floor(Math.random() * alive.length);
+      const t = alive.splice(idx, 1)[0];
+      this.spawnLightning(t);
+      this.hitTarget(t, dmg, null); // dégâts directs (pas de propagation)
+    }
+  }
+
+  spawnLightning(t) {
+    this.bolts.push({ gx: t.gx, gy: t.gy, life: 0.35, seed: Math.random() * 1000 });
+    const w = this.worldOf(t);
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 130;
+      this.particles.push({
+        x: w.x, y: w.y - 14, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        g: 150, life: 0.35 + Math.random() * 0.3,
+        color: Math.random() < 0.5 ? '#cfefff' : '#ffffff', size: 2 + Math.random() * 2,
+      });
+    }
+    this.addFloater(t.gx, t.gy, '⚡', '#cfefff');
   }
 
   /* Démarre une nouvelle vie sur le niveau courant (niveau frais). */
@@ -381,6 +438,10 @@ class Game {
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
     this.throttledSave(dt); // persiste régulièrement la partie en cours
 
+    // Recharge des sorts actifs.
+    for (const k in this.abilityCooldowns)
+      if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt);
+
     const s = this.stats;
     for (const a of this.attackers) {
       a.bob += dt * 6;
@@ -438,12 +499,13 @@ class Game {
   /* Dégâts d'un attaquant sur une cible donnée. */
   attackerDamage(a, t, s) {
     if (a.isDemon) return s.damage;
+    const legion = 1 + s.minionDmgBonus;      // Voie des Légions : serviteurs renforcés
     if (a.isDemolisher) {
       let dmg = s.damage * 2;                 // colosse : frappe lourde
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
-      return dmg;
+      return dmg * legion;
     }
-    return Math.max(1, s.damage * 0.5);       // serviteur
+    return Math.max(1, s.damage * 0.5 * legion); // serviteur
   }
 
   hitTarget(t, dmg, source) {
@@ -555,6 +617,10 @@ class Game {
       f.life -= dt; f.y -= dt * 26;
       if (f.life <= 0) this.floaters.splice(i, 1);
     }
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      this.bolts[i].life -= dt;
+      if (this.bolts[i].life <= 0) this.bolts.splice(i, 1);
+    }
     for (const t of this.targets) {
       if (t.shake > 0) t.shake = Math.max(0, t.shake - dt);
       if (t.dead && t.deathT > 0) t.deathT = Math.max(0, t.deathT - dt);
@@ -645,6 +711,30 @@ class Game {
       if (item.kind === 'target') this.drawTarget(ctx, item.ref);
       else this.drawAttacker(ctx, item.ref);
     }
+
+    // --- Éclairs (sort Foudre) ---
+    for (const bolt of this.bolts) {
+      const w = Iso.toScreen(bolt.gx, bolt.gy);
+      const base = cam.worldToScreen(w.x, w.y);
+      const groundY = base.y - 14 * cam.scale;
+      const topY = groundY - 130 * cam.scale;
+      ctx.globalAlpha = Math.max(0, Math.min(1, bolt.life * 3.2));
+      ctx.strokeStyle = '#e6f6ff';
+      ctx.lineWidth = 3 * cam.scale;
+      ctx.shadowColor = '#7fd0ff';
+      ctx.shadowBlur = 14 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(base.x, topY);
+      const segs = 6;
+      for (let i = 1; i <= segs; i++) {
+        const yy = topY + (groundY - topY) * (i / segs);
+        const jitter = Math.sin(bolt.seed + i * 2.3) * 16 * cam.scale * (1 - i / segs);
+        ctx.lineTo(base.x + jitter, yy);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
 
     // --- Particules ---
     for (const p of this.particles) {

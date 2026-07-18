@@ -125,24 +125,78 @@ const UPGRADES = [
     effect: () => 'Colosse actif : cible le non-vivant en priorité, dégâts renforcés',
     apply: (s, n) => { s.demolisher += n; },
   },
+
+  // --- Spécialisation : deux voies exclusives (choisir l'une verrouille l'autre) ---
+  {
+    id: 'voie_magie', name: 'Voie de la Magie', emoji: '🔮',
+    desc: 'Embrasse les arcanes démoniaques et débloque des sorts dévastateurs. ' +
+          'Choix exclusif : verrouille définitivement la Voie des Légions.',
+    baseCost: 400, mult: 1, max: 1,
+    effect: () => 'Voie engagée : sorts magiques débloqués',
+    apply: (s, n) => { s.voieMagie += n; },
+  },
+  {
+    id: 'foudre', name: 'Foudre Infernale', emoji: '⚡', active: true,
+    desc: 'Sort ACTIF : la foudre s\'abat sur plusieurs cases occupées au hasard ' +
+          'et leur inflige de lourds dégâts. À déclencher toi-même.',
+    baseCost: 250, mult: 1.55, max: 15,
+    effect: (n) => `Frappe ${2 + n} cases · recharge ${Math.max(4, 14 - n)}s`,
+    apply: (s, n) => { s.foudre = n; },
+  },
+  {
+    id: 'pyromancie', name: 'Pyromancie', emoji: '🔥',
+    desc: 'Tes flammes se propagent plus violemment aux cibles adjacentes.',
+    baseCost: 300, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 30)}% de dégâts de zone`,
+    apply: (s, n) => { s.splash += 0.3 * n; },
+  },
+  {
+    id: 'voie_legion', name: 'Voie des Légions', emoji: '🎖️',
+    desc: 'Commande une armée : tes serviteurs deviennent redoutables. ' +
+          'Choix exclusif : verrouille définitivement la Voie de la Magie.',
+    baseCost: 400, mult: 1, max: 1,
+    effect: () => 'Voie engagée : serviteurs renforcés débloqués',
+    apply: (s, n) => { s.voieLegion += n; },
+  },
+  {
+    id: 'legion_force', name: 'Serviteurs Aguerris', emoji: '💪',
+    desc: 'Chaque serviteur — et le Démolisseur — frappe bien plus fort.',
+    baseCost: 350, mult: 1.45, max: 25,
+    effect: (n) => `+${Math.round(n * 25)}% de dégâts des serviteurs`,
+    apply: (s, n) => { s.minionDmgBonus += 0.25 * n; },
+  },
 ];
+
+/* Attaque active : métadonnées (recharge). */
+const ACTIVE_ABILITIES = {
+  foudre: { cooldown: (lvl) => Math.max(4, 14 - lvl) },
+};
 
 /* -------------------------------------------------------------------------
  * Arbre de compétences : position (en coordonnées « monde ») de chaque pouvoir
  * et lien vers son parent. La vue se parcourt librement au drag.
  * ------------------------------------------------------------------------- */
-const TREE_W = 1000;
-const TREE_H = 820;
+const TREE_W = 1200;
+const TREE_H = 860;
 const SKILL_TREE = [
-  { id: 'root',        x: 500, y: 420 },                   // le démon (non achetable)
-  { id: 'griffes',     x: 500, y: 250, parent: 'root' },
-  { id: 'cataclysme',  x: 500, y: 95,  parent: 'griffes' },
-  { id: 'frenesie',    x: 300, y: 175, parent: 'griffes' },
-  { id: 'souffle',     x: 700, y: 175, parent: 'griffes' },
-  { id: 'pattes',      x: 295, y: 430, parent: 'root' },
-  { id: 'longevite',   x: 185, y: 600, parent: 'pattes' },
-  { id: 'recolte',     x: 705, y: 430, parent: 'root' },
-  { id: 'minions',     x: 815, y: 600, parent: 'recolte' },
+  { id: 'root',        x: 560, y: 430 },                   // le démon (non achetable)
+  { id: 'griffes',     x: 560, y: 260, parent: 'root' },
+  { id: 'cataclysme',  x: 560, y: 105, parent: 'griffes' },
+  { id: 'frenesie',    x: 360, y: 185, parent: 'griffes' },
+  { id: 'souffle',     x: 760, y: 185, parent: 'griffes' },
+  { id: 'pattes',      x: 355, y: 440, parent: 'root' },
+  { id: 'longevite',   x: 245, y: 610, parent: 'pattes' },
+  { id: 'recolte',     x: 765, y: 440, parent: 'root' },
+  { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
-  { id: 'demolisseur', x: 880, y: 760, parent: 'minions', req: 8 },
+  { id: 'demolisseur', x: 940, y: 770, parent: 'minions', req: 8 },
+
+  // Voie de la Magie (exclusive) — prolonge la branche du feu.
+  { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
+  { id: 'foudre',      x: 1110, y: 95, parent: 'voie_magie', req: 1 },
+  { id: 'pyromancie',  x: 1110, y: 245, parent: 'voie_magie', req: 1 },
+
+  // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
+  { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
+  { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
 ];

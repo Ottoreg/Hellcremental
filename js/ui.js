@@ -508,6 +508,8 @@ class UI {
     this.$('total-destroyed').textContent = this.fmt(g.totalDestroyed);
     this.refreshTree();
 
+    this.refreshAbilities();
+
     const playing = g.phase === 'playing';
     if (playing) {
       const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
@@ -533,6 +535,44 @@ class UI {
     }
     if (affordable > 0) { badge.textContent = affordable; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
+  }
+
+  /* ---------------------- Sorts actifs (boutons en jeu) ---------------------- */
+  refreshAbilities() {
+    const box = this.$('abilities');
+    const g = this.game;
+    // Sorts possédés, uniquement pendant une partie active.
+    const owned = (g.phase === 'playing')
+      ? UPGRADES.filter((u) => u.active && g.upgradeLevel(u.id) > 0) : [];
+    const ids = owned.map((u) => u.id).join(',');
+    if (box.dataset.ids !== ids) {
+      box.dataset.ids = ids;
+      box.innerHTML = '';
+      for (const def of owned) {
+        const b = document.createElement('button');
+        b.className = 'ability-btn';
+        b.dataset.id = def.id;
+        b.title = def.name;
+        b.innerHTML = `<span class="ab-emoji">${def.emoji}</span><span class="ab-cd"></span>`;
+        b.addEventListener('click', () => {
+          if (g.activateAbility(def.id)) {
+            b.classList.add('cast');
+            setTimeout(() => b.classList.remove('cast'), 200);
+            this.refreshAbilities();
+          }
+        });
+        box.appendChild(b);
+      }
+    }
+    // Recharge / disponibilité.
+    for (const def of owned) {
+      const b = box.querySelector(`[data-id="${def.id}"]`);
+      if (!b) continue;
+      const cd = g.abilityCooldowns[def.id] || 0;
+      const ready = cd <= 0;
+      b.classList.toggle('ready', ready);
+      b.querySelector('.ab-cd').textContent = ready ? '' : Math.ceil(cd);
+    }
   }
 
   /* ---------------------- Vue de fin de niveau (côté Chaos) ---------------------- */
