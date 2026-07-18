@@ -29,11 +29,16 @@ class Game {
     this.attackers = [];       // démon + serviteurs
     this.particles = [];
     this.floaters = [];        // textes flottants (+âmes)
-    this.bolts = [];           // éclairs (sort Foudre)
-    this.impacts = [];         // impacts de météore (sort Météore)
-    this.fires = [];           // nappes de feu (Voie du Clic)
+    this.bolts = [];           // éclairs (sort Foudre / foudroyeurs)
+    this.impacts = [];         // impacts (Météore, Choc Sismique)
+    this.fires = [];           // nappes de feu (Voie du Clic) + flaques de peste
     this.fireCooldown = 0;     // anti-spam des nappes de feu
+    this.blackfires = [];      // feu noir persistant (Flammes Noires)
+    this.blackfireSet = new Set();
+    this.blackfireSpread = 0;
+    this.arc = null;           // arc permanent entre foudroyeurs
     this.abilityCooldowns = {}; // recharge des sorts actifs
+    this.abilityUsed = {};     // sorts « une fois par niveau » déjà utilisés
     this.priestDrain = 0;      // accélération d'exorcisme due aux prêtres
     this.runDestroyed = 0;
     this.runSouls = 0;
@@ -204,6 +209,8 @@ class Game {
         o.group === node.group && o.id !== id && this.upgradeLevel(o.id) >= 1);
       if (rival) return false;
     }
+    // Certains pactes exigent une voie précise (ex. buffs de serviteurs -> Légions).
+    if (node.reqVoie && this.upgradeLevel(node.reqVoie) < 1) return false;
     const parent = node.parent;
     if (!parent || parent === 'root') return true;
     return this.upgradeLevel(parent) >= (node.req || 1);
@@ -240,6 +247,8 @@ class Game {
       minionSpeed: 0, demoDmgBonus: 0, demoSpeed: 0,
       vagabond: 0, vagabondDmg: 0, vagabondSpeed: 0, stormling: 0,
       meteore: 0, huntPriests: 0,
+      stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
+      foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -355,7 +364,12 @@ class Game {
     this.impacts = [];
     this.fires = [];
     this.fireCooldown = 0;
+    this.blackfires = [];
+    this.blackfireSet = new Set();
+    this.blackfireSpread = 0;
+    this.arc = null;
     this.abilityCooldowns = {};
+    this.abilityUsed = {};
     this.attackers = [];
     this.attackers.push(this.makeAttacker('demon'));
     for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker('minion'));
@@ -369,7 +383,11 @@ class Game {
     const a = ACTIVE_ABILITIES[id];
     return a ? a.cooldown(this.upgradeLevel(id)) : 10;
   }
-  abilityReady(id) { return (this.abilityCooldowns[id] || 0) <= 0; }
+  abilityReady(id) {
+    const meta = ACTIVE_ABILITIES[id];
+    if (meta && meta.once && this.abilityUsed[id]) return false; // 1×/niveau déjà utilisé
+    return (this.abilityCooldowns[id] || 0) <= 0;
+  }
 
   /* Déclenche un sort actif (renvoie true si lancé). */
   activateAbility(id) {
@@ -377,7 +395,10 @@ class Game {
     if (this.upgradeLevel(id) <= 0 || !this.abilityReady(id)) return false;
     if (id === 'foudre') this.castFoudre();
     else if (id === 'meteore') this.castMeteore();
-    this.abilityCooldowns[id] = this.abilityCooldownMax(id);
+    else if (id === 'flammes_noires') this.castBlackfire();
+    const meta = ACTIVE_ABILITIES[id];
+    if (meta && meta.once) this.abilityUsed[id] = true;
+    else this.abilityCooldowns[id] = this.abilityCooldownMax(id);
     return true;
   }
 
@@ -390,18 +411,40 @@ class Game {
     // Centre sur une case occupée au hasard (pour toucher quelque chose).
     const c = alive[Math.floor(Math.random() * alive.length)];
     const dmg = Math.round(s.damage * (8 + n * 2));
-    this.spawnMeteor(c.gx, c.gy);
+    const rad = 1 + s.meteoreZone; // Cœur du Météore agrandit la zone
+    this.spawnMeteor(c.gx, c.gy, rad);
     for (const t of this.targets) {
       if (t.dead) continue;
-      if (Math.abs(t.gx - c.gx) <= 1 && Math.abs(t.gy - c.gy) <= 1) { // 3×3 = 9 cases
+      if (Math.abs(t.gx - c.gx) <= rad && Math.abs(t.gy - c.gy) <= rad) {
         t.hp -= dmg; t.shake = 0.3;
         if (t.hp <= 0) this.destroyTarget(t);
       }
     }
   }
 
-  spawnMeteor(gx, gy) {
-    this.impacts.push({ gx, gy, life: 0.6, max: 0.6 });
+  /* Flammes Noires : dépose un feu noir persistant qui se propage sur la grille. */
+  castBlackfire() {
+    const alive = this.targets.filter(t => !t.dead);
+    const c = alive.length
+      ? alive[Math.floor(Math.random() * alive.length)]
+      : { gx: Math.floor(this.gridSize / 2), gy: Math.floor(this.gridSize / 2) };
+    // Foyer initial : la case + ses voisines immédiates.
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        this.igniteBlackfire(Math.round(c.gx) + dx, Math.round(c.gy) + dy);
+    this.addFloater(c.gx, c.gy, '🖤', '#b06bff');
+  }
+
+  igniteBlackfire(x, y) {
+    if (x < 0 || y < 0 || x >= this.gridSize || y >= this.gridSize) return;
+    const key = x + ',' + y;
+    if (this.blackfireSet.has(key)) return;
+    this.blackfireSet.add(key);
+    this.blackfires.push({ gx: x, gy: y, anim: Math.random() * 6 });
+  }
+
+  spawnMeteor(gx, gy, rad) {
+    this.impacts.push({ gx, gy, life: 0.6, max: 0.6, rad: rad || 1 });
     const w = Iso.toScreen(gx, gy);
     for (let i = 0; i < 28; i++) {
       const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
@@ -580,6 +623,42 @@ class Game {
       if (f.life <= 0) this.fires.splice(i, 1);
     }
 
+    // Flammes Noires : feu persistant qui brûle et se propage sur la grille.
+    if (this.blackfires.length) {
+      const bfDps = this.stats.damage * 1.5 * (1 + this.stats.blackfire * 0.4);
+      for (const bf of this.blackfires) {
+        for (const t of this.targets) {
+          if (t.dead) continue;
+          if (Math.abs(t.gx - bf.gx) < 0.75 && Math.abs(t.gy - bf.gy) < 0.75) {
+            t.hp -= bfDps * dt;
+            if (t.hp <= 0) this.destroyTarget(t);
+          }
+        }
+      }
+      // Propagation graduelle vers les cases voisines (comme un incendie).
+      this.blackfireSpread -= dt;
+      if (this.blackfireSpread <= 0) {
+        this.blackfireSpread = 0.8;
+        const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (const bf of this.blackfires.slice()) {
+          const d = dirs[Math.floor(Math.random() * 4)];
+          this.igniteBlackfire(bf.gx + d[0], bf.gy + d[1]);
+        }
+      }
+      // Particules de feu noir.
+      this._bfPart = (this._bfPart || 0) - dt;
+      if (this._bfPart <= 0) {
+        this._bfPart = 0.04;
+        const bf = this.blackfires[Math.floor(Math.random() * this.blackfires.length)];
+        const w = Iso.toScreen(bf.gx + (Math.random() - 0.5) * 0.7, bf.gy + (Math.random() - 0.5) * 0.7);
+        this.particles.push({
+          x: w.x, y: w.y - 8, vx: (Math.random() - 0.5) * 12, vy: -20 - Math.random() * 30,
+          g: -20, life: 0.5 + Math.random() * 0.4,
+          color: Math.random() < 0.5 ? '#3a1050' : '#7b2fb0', size: 2 + Math.random() * 2.5,
+        });
+      }
+    }
+
     const s = this.stats;
     for (const a of this.attackers) {
       a.bob += dt * 6;
@@ -610,13 +689,58 @@ class Game {
         if (a.cooldown <= 0) {
           a.cooldown = s.attackInterval;
           a.lunge = 1;
+          // Choc Sismique : premier coup du Colosse sur un bâtiment -> onde de choc.
+          if (a.isDemolisher && s.demoTrait && !t.def.living && t.hp >= t.maxHp)
+            this.demolisherShockwave(t, s);
           this.hitTarget(t, this.attackerDamage(a, t, s), a);
         }
       }
     }
 
+    // Arc Éternel : arc permanent entre foudroyeurs qui brûle les cases traversées.
+    this.updateFoudroyeurArc(dt, s);
+
     // Progression : tout détruit -> niveau nettoyé.
     if (this.runDestroyed >= this.totalToDestroy) this.endRun(true);
+  }
+
+  /* Onde de choc du Colosse (premier coup sur un bâtiment). */
+  demolisherShockwave(t, s) {
+    const dmg = s.damage * 3 * (1 + s.minionDmgBonus + s.demoDmgBonus);
+    this.impacts.push({ gx: t.gx, gy: t.gy, life: 0.4, max: 0.4, rad: 1 });
+    for (const o of this.targets) {
+      if (o.dead || o === t) continue;
+      if (Math.abs(o.gx - t.gx) <= 1 && Math.abs(o.gy - t.gy) <= 1) {
+        o.hp -= dmg; o.shake = 0.25;
+        if (o.hp <= 0) this.destroyTarget(o);
+      }
+    }
+  }
+
+  /* Arc permanent reliant les foudroyeurs : dégâts le long du segment. */
+  updateFoudroyeurArc(dt, s) {
+    this.arc = null;
+    if (s.foudroyeurTrait < 1) return;
+    const storms = this.attackers.filter(x => x.isStormling);
+    if (storms.length < 2) return;
+    const A = storms[0], B = storms[1];
+    this.arc = { ax: A.gx, ay: A.gy, bx: B.gx, by: B.gy };
+    const dps = s.damage * 2 * (1 + s.stormlingDmg);
+    for (const t of this.targets) {
+      if (t.dead) continue;
+      if (this.distToSegment(t.gx, t.gy, A.gx, A.gy, B.gx, B.gy) <= 0.6) {
+        t.hp -= dps * dt;
+        if (t.hp <= 0) this.destroyTarget(t);
+      }
+    }
+  }
+
+  distToSegment(px, py, ax, ay, bx, by) {
+    const vx = bx - ax, vy = by - ay;
+    const len2 = vx * vx + vy * vy || 1e-6;
+    let u = ((px - ax) * vx + (py - ay) * vy) / len2;
+    u = Math.max(0, Math.min(1, u));
+    return Math.hypot(px - (ax + u * vx), py - (ay + u * vy));
   }
 
   /* Vagabond : erre au hasard et répand un nuage de peste (dégâts de zone). */
@@ -633,8 +757,8 @@ class Game {
       a.gx += (dx / dist) * move;
       a.gy += (dy / dist) * move;
     }
-    // Nuage de peste : dégâts continus autour du vagabond.
-    const radius = 1.3;
+    // Nuage de peste : dégâts continus autour du vagabond (plus large avec le trait).
+    const radius = s.vagabondTrait ? 2.0 : 1.3;
     const dps = s.damage * 2.0 * (1 + s.vagabondDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
@@ -645,19 +769,35 @@ class Game {
     }
     a.plagueTick -= dt;
     if (a.plagueTick <= 0) { a.plagueTick = 0.09; this.spawnPlagueParticle(a, radius); }
+    // Peste Rampante : laisse des flaques de peste persistantes derrière soi.
+    if (s.vagabondTrait) {
+      a.patchTick = (a.patchTick || 0) - dt;
+      if (a.patchTick <= 0) {
+        a.patchTick = 0.6;
+        this.fires.push({
+          gx: a.gx, gy: a.gy, radius: 1.0, dps: dps * 0.6,
+          life: 3.5, tick: 0, plague: true,
+        });
+      }
+    }
   }
 
   /* Foudroyeur : immobile, lance de petits éclairs sur des cibles au hasard. */
   updateStormling(a, dt, s) {
     a.cooldown -= dt;
     if (a.cooldown > 0) return;
-    a.cooldown = 2.0;
+    // Cadence : recharge réduite. Arc Éternel : plusieurs éclairs par salve.
+    a.cooldown = 2.0 * Math.pow(0.92, s.stormlingRate);
     const alive = this.targets.filter(t => !t.dead);
     if (!alive.length) return;
-    const t = alive[Math.floor(Math.random() * alive.length)];
     a.lunge = 1;
-    this.spawnLightning(t, true); // petit éclair
-    this.hitTarget(t, s.damage * 7.5, null);
+    const dmg = s.damage * 7.5 * (1 + s.stormlingDmg);
+    const bolts = 1 + s.foudroyeurTrait;
+    for (let i = 0; i < bolts; i++) {
+      const t = alive[Math.floor(Math.random() * alive.length)];
+      this.spawnLightning(t, true); // petit éclair
+      this.hitTarget(t, dmg, null);
+    }
   }
 
   nearestTarget(a) {
@@ -913,7 +1053,7 @@ class Game {
       }
     }
 
-    // --- Nappes de feu (au sol, sous les objets) ---
+    // --- Nappes de feu / flaques de peste (au sol, sous les objets) ---
     for (const f of this.fires) {
       const w = Iso.toScreen(f.gx, f.gy);
       const p = cam.worldToScreen(w.x, w.y);
@@ -921,9 +1061,32 @@ class Game {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 110 + f.gx * 2);
       const a = Math.min(1, f.life) * (0.35 + pulse * 0.18);
       const grd = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, R);
-      grd.addColorStop(0, `rgba(255,150,20,${a})`);
-      grd.addColorStop(0.55, `rgba(220,60,10,${a * 0.55})`);
-      grd.addColorStop(1, 'rgba(120,20,0,0)');
+      if (f.plague) {
+        grd.addColorStop(0, `rgba(120,200,120,${a})`);
+        grd.addColorStop(0.55, `rgba(70,140,80,${a * 0.55})`);
+        grd.addColorStop(1, 'rgba(30,70,40,0)');
+      } else {
+        grd.addColorStop(0, `rgba(255,150,20,${a})`);
+        grd.addColorStop(0.55, `rgba(220,60,10,${a * 0.55})`);
+        grd.addColorStop(1, 'rgba(120,20,0,0)');
+      }
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // --- Feu noir persistant (Flammes Noires) ---
+    for (const bf of this.blackfires) {
+      const w = Iso.toScreen(bf.gx, bf.gy);
+      const p = cam.worldToScreen(w.x, w.y);
+      const R = 0.85 * CONFIG.TILE_W * 0.62 * cam.scale;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 90 + bf.anim);
+      const a = 0.55 + pulse * 0.25;
+      const grd = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, R);
+      grd.addColorStop(0, `rgba(30,8,45,${a})`);
+      grd.addColorStop(0.5, `rgba(120,40,180,${a * 0.5})`);
+      grd.addColorStop(1, 'rgba(40,0,60,0)');
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
@@ -986,6 +1149,37 @@ class Game {
       ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
+
+    // --- Arc permanent entre foudroyeurs (trait Foudroyeur) ---
+    if (this.arc) {
+      const wa = Iso.toScreen(this.arc.ax, this.arc.ay);
+      const wb = Iso.toScreen(this.arc.bx, this.arc.by);
+      const pa = cam.worldToScreen(wa.x, wa.y);
+      const pb = cam.worldToScreen(wb.x, wb.y);
+      const midY = -34 * cam.scale; // léger décollement du sol
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len; // normale pour le jitter
+      ctx.strokeStyle = '#dff2ff';
+      ctx.lineWidth = 2.4 * cam.scale;
+      ctx.shadowColor = '#7fd0ff';
+      ctx.shadowBlur = 12 * cam.scale;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y + midY);
+      const segs = 10;
+      const t = Date.now() / 55;
+      for (let i = 1; i <= segs; i++) {
+        const f = i / segs;
+        const x = pa.x + dx * f;
+        const y = pa.y + midY + dy * f;
+        const amp = Math.sin(t + i * 1.7) * 14 * cam.scale * Math.sin(Math.PI * f);
+        ctx.lineTo(x + nx * amp, y + ny * amp);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
 
     // --- Impacts de météore (traînée + onde de choc) ---
     for (const im of this.impacts) {

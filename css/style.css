@@ -141,6 +141,9 @@ html, body {
   font-variant-numeric: tabular-nums; color: #cfe8ff;
 }
 .ability-btn.ready .ab-cd { display: none; }
+/* Sort à usage unique déjà consommé pour ce niveau. */
+.ability-btn.used { filter: grayscale(1) brightness(.6); cursor: default; opacity: .8; }
+.ability-btn.used .ab-cd { background: rgba(8,4,10,.4); color: #8fd08f; font-size: 22px; }
 @keyframes abReady { 0%,100% { box-shadow: 0 0 16px rgba(120,200,255,.5); } 50% { box-shadow: 0 0 24px rgba(120,200,255,.85); } }
 
 /* ---------------- Écran de démarrage / Overlay ---------------- */
@@ -268,8 +271,8 @@ html, body {
     repeating-linear-gradient(45deg, #100809 0 24px, #130a0c 24px 48px);
 }
 #skilltree:active { cursor: grabbing; }
-#tree-world { position: absolute; top: 0; left: 0; width: 1400px; height: 1140px; transform-origin: 0 0; will-change: transform; }
-#tree-links { position: absolute; top: 0; left: 0; width: 1400px; height: 1140px; pointer-events: none; overflow: visible; }
+#tree-world { position: absolute; top: 0; left: 0; width: 1560px; height: 1320px; transform-origin: 0 0; will-change: transform; }
+#tree-links { position: absolute; top: 0; left: 0; width: 1560px; height: 1320px; pointer-events: none; overflow: visible; }
 #tree-links line { stroke: #4a2a2f; stroke-width: 3; }
 #tree-links line.lit { stroke: #7a3b18; }
 

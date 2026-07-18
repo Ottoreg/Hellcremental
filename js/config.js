@@ -191,6 +191,22 @@ const UPGRADES = [
     apply: (s, n) => { s.meteore = n; },
   },
   {
+    id: 'meteore_zone', name: 'Cœur du Météore', emoji: '🌌',
+    desc: 'Agrandit la zone d\'impact du Météore de 1, 2 puis 3 cases.',
+    baseCost: 3000, mult: 4, max: 3,
+    effect: (n) => `Zone d'impact +${n} case${n > 1 ? 's' : ''}`,
+    apply: (s, n) => { s.meteoreZone = n; },
+  },
+  {
+    id: 'flammes_noires', name: 'Flammes Noires', emoji: '🖤', active: true,
+    desc: 'Sort ACTIF (une seule fois par niveau) : dépose un feu noir qui ne ' +
+          's\'éteint jamais, inflige des dégâts de zone et se propage peu à peu ' +
+          'sur toute la grille comme un incendie.',
+    baseCost: 25000, mult: 1.6, max: 10,
+    effect: (n) => `Incendie noir · ${Math.round((1 + n * 0.4) * 10) / 10}× dégâts · 1×/niveau`,
+    apply: (s, n) => { s.blackfire = n; },
+  },
+  {
     id: 'voie_legion', name: 'Voie des Légions', emoji: '🎖️',
     desc: 'Commande une armée : tes serviteurs deviennent redoutables. ' +
           'Choix exclusif : verrouille définitivement toutes les autres voies.',
@@ -226,8 +242,8 @@ const UPGRADES = [
     id: 'minion_speed', name: 'Serviteurs Agiles', emoji: '💨',
     desc: 'Tes esprits serviteurs se déplacent plus vite.',
     baseCost: 500, mult: 1.45, max: 20,
-    effect: (n) => `+${Math.round(n * 15)}% de vitesse des serviteurs`,
-    apply: (s, n) => { s.minionSpeed += 0.15 * n; },
+    effect: (n) => `+${Math.round(n * 7.5)}% de vitesse des serviteurs`,
+    apply: (s, n) => { s.minionSpeed += 0.075 * n; },
   },
 
   // --- Améliorations du Colosse (Démolisseur) ---
@@ -242,8 +258,8 @@ const UPGRADES = [
     id: 'demo_speed', name: 'Colosse Furieux', emoji: '🏃',
     desc: 'Le Démolisseur se déplace plus vite.',
     baseCost: 1500, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 15)}% de vitesse du Colosse`,
-    apply: (s, n) => { s.demoSpeed += 0.15 * n; },
+    effect: (n) => `+${Math.round(n * 7.5)}% de vitesse du Colosse`,
+    apply: (s, n) => { s.demoSpeed += 0.075 * n; },
   },
 
   // --- Vagabonds (après le Colosse) : errent et répandent la peste ---
@@ -266,8 +282,8 @@ const UPGRADES = [
     id: 'vagabond_speed', name: 'Errance Fébrile', emoji: '👣',
     desc: 'Les vagabonds errent plus vite et couvrent plus de terrain.',
     baseCost: 3000, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 15)}% de vitesse d'errance`,
-    apply: (s, n) => { s.vagabondSpeed += 0.15 * n; },
+    effect: (n) => `+${Math.round(n * 7.5)}% de vitesse d'errance`,
+    apply: (s, n) => { s.vagabondSpeed += 0.075 * n; },
   },
 
   // --- Foudroyeur (après les vagabonds) : immobile, petits éclairs ---
@@ -278,6 +294,46 @@ const UPGRADES = [
     baseCost: 8000, mult: 8, max: 2,
     effect: (n) => `${n} foudroyeur${n > 1 ? 's' : ''} · petits éclairs`,
     apply: (s, n) => { s.stormling = n; },
+  },
+  {
+    id: 'foudroyeur_dmg', name: 'Décharge Amplifiée', emoji: '⚡',
+    desc: 'Les éclairs des foudroyeurs frappent plus fort.',
+    baseCost: 6000, mult: 1.5, max: 20,
+    effect: (n) => `+${Math.round(n * 30)}% de dégâts des éclairs`,
+    apply: (s, n) => { s.stormlingDmg += 0.3 * n; },
+  },
+  {
+    id: 'foudroyeur_rate', name: 'Cadence Foudroyante', emoji: '⏱️',
+    desc: 'Les foudroyeurs lancent leurs éclairs plus souvent.',
+    baseCost: 6000, mult: 1.5, max: 15,
+    effect: (n) => `−${Math.round((1 - Math.pow(0.92, n)) * 100)}% de temps entre éclairs`,
+    apply: (s, n) => { s.stormlingRate += n; },
+  },
+
+  // --- Traits principaux (un par serviteur) ---
+  {
+    id: 'demo_trait', name: 'Choc Sismique', emoji: '🌐',
+    desc: 'Le premier coup du Démolisseur sur un bâtiment déclenche une onde ' +
+          'de choc qui pulvérise les cases alentour.',
+    baseCost: 20000, mult: 1, max: 1,
+    effect: () => 'Onde de choc au premier coup sur un bâtiment',
+    apply: (s, n) => { s.demoTrait = n; },
+  },
+  {
+    id: 'vagabond_trait', name: 'Peste Rampante', emoji: '☣️',
+    desc: 'Le nuage de peste s\'étend davantage et laisse derrière les vagabonds ' +
+          'des flaques de peste qui rongent encore un moment.',
+    baseCost: 20000, mult: 1, max: 1,
+    effect: () => 'Peste plus large + flaques persistantes',
+    apply: (s, n) => { s.vagabondTrait = n; },
+  },
+  {
+    id: 'foudroyeur_trait', name: 'Arc Éternel', emoji: '🔗',
+    desc: 'Un arc électrique permanent relie les foudroyeurs et brûle les cases ' +
+          'traversées ; chaque niveau ajoute un éclair lancé simultanément.',
+    baseCost: 30000, mult: 3, max: 3,
+    effect: (n) => `Arc permanent · +${n} éclair${n > 1 ? 's' : ''} par salve`,
+    apply: (s, n) => { s.foudroyeurTrait = n; },
   },
   {
     id: 'voie_clic', name: 'Voie du Clic Démoniaque', emoji: '🖐️',
@@ -304,18 +360,19 @@ const UPGRADES = [
   },
 ];
 
-/* Attaques actives : métadonnées (recharge). */
+/* Attaques actives : métadonnées (recharge ; `once` = une seule fois par niveau). */
 const ACTIVE_ABILITIES = {
   foudre: { cooldown: (lvl) => Math.max(4, 14 - lvl) },
   meteore: { cooldown: (lvl) => Math.max(8, 20 - lvl) },
+  flammes_noires: { cooldown: () => 0, once: true },
 };
 
 /* -------------------------------------------------------------------------
  * Arbre de compétences : position (en coordonnées « monde ») de chaque pouvoir
  * et lien vers son parent. La vue se parcourt librement au drag.
  * ------------------------------------------------------------------------- */
-const TREE_W = 1400;
-const TREE_H = 1140;
+const TREE_W = 1560;
+const TREE_H = 1320;
 const SKILL_TREE = [
   { id: 'root',        x: 560, y: 430 },                   // le démon (non achetable)
   { id: 'griffes',     x: 560, y: 260, parent: 'root' },
@@ -330,24 +387,31 @@ const SKILL_TREE = [
   { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
   { id: 'demolisseur', x: 940, y: 770, parent: 'minions', req: 8 },
-  // Améliorations des serviteurs de base.
-  { id: 'minion_dmg',   x: 1030, y: 545, parent: 'minions', req: 1 },
-  { id: 'minion_speed', x: 1090, y: 650, parent: 'minions', req: 1 },
-  // Améliorations du Colosse.
-  { id: 'demo_dmg',     x: 1130, y: 745, parent: 'demolisseur', req: 1 },
-  { id: 'demo_speed',   x: 1170, y: 855, parent: 'demolisseur', req: 1 },
-  // Vagabonds (après le Colosse) et leurs améliorations.
+  // Améliorations dmg/vitesse : réservées à la Voie des Légions (reqVoie).
+  { id: 'minion_dmg',   x: 1030, y: 545, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
+  { id: 'minion_speed', x: 1110, y: 620, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
+  { id: 'demo_dmg',     x: 1150, y: 730, parent: 'demolisseur', req: 1, reqVoie: 'voie_legion' },
+  { id: 'demo_speed',   x: 1200, y: 835, parent: 'demolisseur', req: 1, reqVoie: 'voie_legion' },
+  // Trait du Colosse (disponible sans la voie).
+  { id: 'demo_trait',   x: 1290, y: 760, parent: 'demolisseur', req: 1 },
+  // Vagabonds (après le Colosse).
   { id: 'vagabond',       x: 930, y: 930,  parent: 'demolisseur', req: 1 },
-  { id: 'vagabond_dmg',   x: 785, y: 985,  parent: 'vagabond', req: 1 },
-  { id: 'vagabond_speed', x: 1075, y: 990, parent: 'vagabond', req: 1 },
-  // Foudroyeur (après les vagabonds).
-  { id: 'foudroyeur',   x: 930, y: 1075, parent: 'vagabond', req: 1 },
+  { id: 'vagabond_dmg',   x: 770, y: 960,  parent: 'vagabond', req: 1, reqVoie: 'voie_legion' },
+  { id: 'vagabond_speed', x: 700, y: 1050, parent: 'vagabond', req: 1, reqVoie: 'voie_legion' },
+  { id: 'vagabond_trait', x: 1090, y: 985, parent: 'vagabond', req: 1 },
+  // Foudroyeur (après les vagabonds) et ses améliorations.
+  { id: 'foudroyeur',       x: 930,  y: 1080, parent: 'vagabond', req: 1 },
+  { id: 'foudroyeur_dmg',   x: 770,  y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
+  { id: 'foudroyeur_rate',  x: 1090, y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
+  { id: 'foudroyeur_trait', x: 930,  y: 1245, parent: 'foudroyeur', req: 1 },
 
   // Voie de la Magie (exclusive) — prolonge la branche du feu.
   { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
   { id: 'foudre',      x: 1110, y: 95, parent: 'voie_magie', req: 1 },
   { id: 'pyromancie',  x: 1110, y: 245, parent: 'voie_magie', req: 1 },
   { id: 'meteore',     x: 1270, y: 60, parent: 'foudre', req: 1 },
+  { id: 'meteore_zone',x: 1420, y: 120, parent: 'meteore', req: 1 },
+  { id: 'flammes_noires', x: 1290, y: 300, parent: 'pyromancie', req: 1 },
 
   // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
   { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
