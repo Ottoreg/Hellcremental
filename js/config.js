@@ -98,13 +98,27 @@ const UPGRADES = [
     effect: (n) => `+${(0.4 * n).toFixed(1)} vitesse`,
     apply: (s, n) => { s.moveSpeed += 0.4 * n; },
   },
+  // Longévité : trois pactes uniques de +5 s, chacun 20× plus cher que le précédent.
   {
-    // Bonus de survie plafonné à +40 s au total (max 10 niveaux × +4 s).
-    id: 'longevite', name: 'Longévité Maudite', emoji: '⏳',
-    desc: 'Résiste plus longtemps avant d\'être exorcisé (jusqu\'à +40 s).',
-    baseCost: 22, mult: 1.5, max: 10,
-    effect: (n) => `+${4 * n}s de survie`,
-    apply: (s, n) => { s.lifespan += 4 * n; },
+    id: 'longevite1', name: 'Longévité Maudite', emoji: '⏳',
+    desc: 'Résiste 5 secondes de plus avant d\'être exorcisé.',
+    baseCost: 30, mult: 1, max: 1,
+    effect: () => '+5s de survie',
+    apply: (s, n) => { s.lifespan += 5 * n; },
+  },
+  {
+    id: 'longevite2', name: 'Endurance Damnée', emoji: '⌛',
+    desc: 'Encore 5 secondes de sursis avant l\'exorcisme.',
+    baseCost: 600, mult: 1, max: 1,
+    effect: () => '+5s de survie',
+    apply: (s, n) => { s.lifespan += 5 * n; },
+  },
+  {
+    id: 'longevite3', name: 'Âme Increvable', emoji: '🕰️',
+    desc: 'Un dernier répit de 5 secondes face aux prières.',
+    baseCost: 12000, mult: 1, max: 1,
+    effect: () => '+5s de survie',
+    apply: (s, n) => { s.lifespan += 5 * n; },
   },
   {
     id: 'souffle', name: 'Souffle de Feu', emoji: '🔥',
@@ -225,7 +239,9 @@ const SKILL_TREE = [
   { id: 'frenesie',    x: 360, y: 185, parent: 'griffes' },
   { id: 'souffle',     x: 760, y: 185, parent: 'griffes' },
   { id: 'pattes',      x: 355, y: 440, parent: 'root' },
-  { id: 'longevite',   x: 245, y: 610, parent: 'pattes' },
+  { id: 'longevite1',  x: 240, y: 585, parent: 'pattes' },
+  { id: 'longevite2',  x: 130, y: 690, parent: 'longevite1' },
+  { id: 'longevite3',  x: 235, y: 795, parent: 'longevite2' },
   { id: 'recolte',     x: 765, y: 440, parent: 'root' },
   { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).

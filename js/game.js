@@ -241,8 +241,6 @@ class Game {
       const n = this.upgradeLevel(def.id);
       if (n > 0) def.apply(s, n);
     }
-    // Plafond du bonus de durée de partie : +40 s maximum.
-    s.lifespan = Math.min(s.lifespan, CONFIG.BASE_LIFESPAN + 40);
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
     this.stats = s;
     if (resetLifespan) this.timeLeft = s.lifespan;
