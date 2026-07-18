@@ -143,7 +143,8 @@ const UPGRADES = [
   },
   {
     id: 'cataclysme', name: 'Clic Cataclysmique', emoji: '☄️',
-    desc: 'Ton clic frappe plus fort la cible visée.',
+    desc: 'Débloque le clic infernal : touche une cible pour la frapper toi-même. ' +
+          'Chaque niveau augmente les dégâts du clic.',
     baseCost: 45, mult: 1.35, max: 50,
     effect: (n) => `+${6 * n} dégâts au clic`,
     apply: (s, n) => { s.clickDamage += 6 * n; },
@@ -182,6 +183,14 @@ const UPGRADES = [
     apply: (s, n) => { s.splash += 0.3 * n; },
   },
   {
+    id: 'meteore', name: 'Météore Infernal', emoji: '🌠', active: true,
+    desc: 'Sort ACTIF : un météore s\'abat sur une zone de 9 cases (3×3) au ' +
+          'hasard et pulvérise tout ce qui s\'y trouve. À déclencher toi-même.',
+    baseCost: 1200, mult: 1.6, max: 15,
+    effect: (n) => `Zone 3×3 · ${8 + n * 2}× dégâts · recharge ${Math.max(8, 20 - n)}s`,
+    apply: (s, n) => { s.meteore = n; },
+  },
+  {
     id: 'voie_legion', name: 'Voie des Légions', emoji: '🎖️',
     desc: 'Commande une armée : tes serviteurs deviennent redoutables. ' +
           'Choix exclusif : verrouille définitivement la Voie de la Magie.',
@@ -195,6 +204,14 @@ const UPGRADES = [
     baseCost: 350, mult: 1.45, max: 25,
     effect: (n) => `+${Math.round(n * 25)}% de dégâts des serviteurs`,
     apply: (s, n) => { s.minionDmgBonus += 0.25 * n; },
+  },
+  {
+    id: 'chasse_pretres', name: 'Traque Sacrilège', emoji: '🎯',
+    desc: 'Tes esprits serviteurs prennent pour cible en PRIORITÉ les prêtres, ' +
+          'pour couper court à l\'exorcisme. Pacte rare et coûteux.',
+    baseCost: 250000, mult: 1, max: 1,
+    effect: () => 'Les serviteurs ciblent les prêtres en priorité',
+    apply: (s, n) => { s.huntPriests = n; },
   },
 
   // --- Améliorations des serviteurs de base ---
@@ -287,9 +304,10 @@ const UPGRADES = [
   },
 ];
 
-/* Attaque active : métadonnées (recharge). */
+/* Attaques actives : métadonnées (recharge). */
 const ACTIVE_ABILITIES = {
   foudre: { cooldown: (lvl) => Math.max(4, 14 - lvl) },
+  meteore: { cooldown: (lvl) => Math.max(8, 20 - lvl) },
 };
 
 /* -------------------------------------------------------------------------
@@ -329,10 +347,12 @@ const SKILL_TREE = [
   { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
   { id: 'foudre',      x: 1110, y: 95, parent: 'voie_magie', req: 1 },
   { id: 'pyromancie',  x: 1110, y: 245, parent: 'voie_magie', req: 1 },
+  { id: 'meteore',     x: 1270, y: 60, parent: 'foudre', req: 1 },
 
   // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
   { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
   { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
+  { id: 'chasse_pretres', x: 425, y: 860, parent: 'legion_force', req: 1 },
 
   // Voie du Clic Démoniaque (exclusive) — prolonge la branche du clic.
   { id: 'voie_clic',   x: 430, y: 65,  parent: 'cataclysme', req: 1, group: 'voie' },
