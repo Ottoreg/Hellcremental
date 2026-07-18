@@ -30,6 +30,7 @@ class Game {
     this.particles = [];
     this.floaters = [];        // textes flottants (+âmes)
     this.bolts = [];           // éclairs (sort Foudre)
+    this.impacts = [];         // impacts de météore (sort Météore)
     this.fires = [];           // nappes de feu (Voie du Clic)
     this.fireCooldown = 0;     // anti-spam des nappes de feu
     this.abilityCooldowns = {}; // recharge des sorts actifs
@@ -238,11 +239,14 @@ class Game {
       voieClic: 0, fireWave: 0,
       minionSpeed: 0, demoDmgBonus: 0, demoSpeed: 0,
       vagabond: 0, vagabondDmg: 0, vagabondSpeed: 0, stormling: 0,
+      meteore: 0, huntPriests: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
       if (n > 0) def.apply(s, n);
     }
+    // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
+    s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
     this.stats = s;
     if (resetLifespan) this.timeLeft = s.lifespan;
@@ -348,6 +352,7 @@ class Game {
     this.particles = [];
     this.floaters = [];
     this.bolts = [];
+    this.impacts = [];
     this.fires = [];
     this.fireCooldown = 0;
     this.abilityCooldowns = {};
@@ -371,8 +376,43 @@ class Game {
     if (this.phase !== 'playing' || this.paused) return false;
     if (this.upgradeLevel(id) <= 0 || !this.abilityReady(id)) return false;
     if (id === 'foudre') this.castFoudre();
+    else if (id === 'meteore') this.castMeteore();
     this.abilityCooldowns[id] = this.abilityCooldownMax(id);
     return true;
+  }
+
+  /* Météore : s'abat sur une zone 3×3 (9 cases) au hasard, gros dégâts. */
+  castMeteore() {
+    const s = this.stats;
+    const n = Math.max(1, s.meteore);
+    const alive = this.targets.filter(t => !t.dead);
+    if (!alive.length) return;
+    // Centre sur une case occupée au hasard (pour toucher quelque chose).
+    const c = alive[Math.floor(Math.random() * alive.length)];
+    const dmg = Math.round(s.damage * (8 + n * 2));
+    this.spawnMeteor(c.gx, c.gy);
+    for (const t of this.targets) {
+      if (t.dead) continue;
+      if (Math.abs(t.gx - c.gx) <= 1 && Math.abs(t.gy - c.gy) <= 1) { // 3×3 = 9 cases
+        t.hp -= dmg; t.shake = 0.3;
+        if (t.hp <= 0) this.destroyTarget(t);
+      }
+    }
+  }
+
+  spawnMeteor(gx, gy) {
+    this.impacts.push({ gx, gy, life: 0.6, max: 0.6 });
+    const w = Iso.toScreen(gx, gy);
+    for (let i = 0; i < 28; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+      this.particles.push({
+        x: w.x, y: w.y - 14, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        g: 170, life: 0.5 + Math.random() * 0.5,
+        color: ['#ff7b00', '#ffd24d', '#c1121f', '#8a3b00'][Math.floor(Math.random() * 4)],
+        size: 2 + Math.random() * 3,
+      });
+    }
+    this.addFloater(gx, gy, '🌠', '#ffb04d');
   }
 
   /* Foudre : frappe plusieurs cases occupées au hasard pour de lourds dégâts. */
@@ -626,6 +666,11 @@ class Game {
       const t = this.nearestWhere(a, (o) => !o.def.living);
       if (t) return t;
     }
+    // Traque Sacrilège : les serviteurs de base chassent les prêtres d'abord.
+    if (a.kind === 'minion' && this.stats.huntPriests) {
+      const t = this.nearestWhere(a, (o) => o.priest);
+      if (t) return t;
+    }
     return this.nearestWhere(a, null);
   }
 
@@ -693,6 +738,7 @@ class Game {
   clickAt(sx, sy) {
     if (this.phase !== 'playing' || this.paused) return;
     const s = this.stats;
+    if (!s.clickUnlocked) return; // clic non débloqué (pacte Clic Cataclysmique)
     const t = this.targetAtScreen(sx, sy);
     if (t) {
       // Redirige le démon et inflige des dégâts de clic.
@@ -786,6 +832,10 @@ class Game {
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       this.bolts[i].life -= dt;
       if (this.bolts[i].life <= 0) this.bolts.splice(i, 1);
+    }
+    for (let i = this.impacts.length - 1; i >= 0; i--) {
+      this.impacts[i].life -= dt;
+      if (this.impacts[i].life <= 0) this.impacts.splice(i, 1);
     }
     for (const t of this.targets) {
       if (t.shake > 0) t.shake = Math.max(0, t.shake - dt);
@@ -934,6 +984,35 @@ class Game {
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
+    // --- Impacts de météore (traînée + onde de choc) ---
+    for (const im of this.impacts) {
+      const w = Iso.toScreen(im.gx, im.gy);
+      const base = cam.worldToScreen(w.x, w.y);
+      const groundY = base.y - 14 * cam.scale;
+      const k = 1 - im.life / im.max; // 0 -> 1
+      // Traînée du météore qui tombe (début de l'impact).
+      if (im.life > im.max * 0.55) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#ffd24d';
+        ctx.lineWidth = 6 * cam.scale;
+        ctx.shadowColor = '#ff7b00'; ctx.shadowBlur = 20 * cam.scale;
+        ctx.beginPath();
+        ctx.moveTo(base.x + 150 * cam.scale, groundY - 260 * cam.scale);
+        ctx.lineTo(base.x, groundY);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      // Onde de choc qui se propage.
+      const R = k * 2.4 * CONFIG.TILE_W * cam.scale;
+      ctx.globalAlpha = Math.max(0, im.life / im.max);
+      ctx.strokeStyle = '#ffb04d';
+      ctx.lineWidth = 4 * cam.scale;
+      ctx.beginPath();
+      ctx.ellipse(base.x, groundY, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
