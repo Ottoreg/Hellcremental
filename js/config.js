@@ -158,11 +158,21 @@ const UPGRADES = [
     apply: (s, n) => { s.demolisher += n; },
   },
 
-  // --- Spécialisation : deux voies exclusives (choisir l'une verrouille l'autre) ---
+  // --- Spécialisation : trois voies exclusives (choisir l'une verrouille les autres) ---
+  {
+    id: 'pacte_libre', name: 'Serment du Chaos Absolu', emoji: '♾️',
+    desc: 'Brise la loi des voies. Une fois ce serment scellé, la règle du choix ' +
+          'unique ne s\'applique plus : tu peux emprunter TOUTES les voies ' +
+          '(Magie, Légions et Clic) au lieu d\'une seule.',
+    baseCost: 1000000, mult: 1, max: 1,
+    effect: () => 'Toutes les voies deviennent accessibles',
+    apply: (s, n) => { s.voiesLibres = n; },
+  },
   {
     id: 'voie_magie', name: 'Voie de la Magie', emoji: '🔮',
     desc: 'Embrasse les arcanes démoniaques et débloque des sorts dévastateurs. ' +
-          'Choix exclusif : verrouille définitivement toutes les autres voies.',
+          'Choix exclusif : verrouille les autres voies — sauf si tu as scellé ' +
+          'le Serment du Chaos Absolu.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : sorts magiques débloqués',
     apply: (s, n) => { s.voieMagie += n; },
@@ -209,7 +219,8 @@ const UPGRADES = [
   {
     id: 'voie_legion', name: 'Voie des Légions', emoji: '🎖️',
     desc: 'Commande une armée : tes serviteurs deviennent redoutables. ' +
-          'Choix exclusif : verrouille définitivement toutes les autres voies.',
+          'Choix exclusif : verrouille les autres voies — sauf si tu as scellé ' +
+          'le Serment du Chaos Absolu.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : serviteurs renforcés débloqués',
     apply: (s, n) => { s.voieLegion += n; },
@@ -338,7 +349,8 @@ const UPGRADES = [
   {
     id: 'voie_clic', name: 'Voie du Clic Démoniaque', emoji: '🖐️',
     desc: 'Canalise ta rage dans ta griffe : tes clics deviennent dévastateurs. ' +
-          'Choix exclusif : verrouille définitivement toutes les autres voies.',
+          'Choix exclusif : verrouille les autres voies — sauf si tu as scellé ' +
+          'le Serment du Chaos Absolu.',
     baseCost: 400, mult: 1, max: 1,
     effect: () => 'Voie engagée : clic démoniaque débloqué',
     apply: (s, n) => { s.voieClic += n; },
@@ -375,6 +387,8 @@ const TREE_W = 1560;
 const TREE_H = 1320;
 const SKILL_TREE = [
   { id: 'root',        x: 560, y: 430 },                   // le démon (non achetable)
+  // Serment du Chaos : lève l'exclusivité des voies (accessible dès le départ).
+  { id: 'pacte_libre', x: 555, y: 600, parent: 'root' },
   { id: 'griffes',     x: 560, y: 260, parent: 'root' },
   { id: 'cataclysme',  x: 560, y: 105, parent: 'griffes' },
   { id: 'frenesie',    x: 360, y: 185, parent: 'griffes' },
