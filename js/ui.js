@@ -47,6 +47,13 @@ class UI {
       this.setView('shop'); this.refresh();
     });
 
+    // --- Bouton de test temporaire : +âmes ---
+    this.$('cheat-btn').addEventListener('click', () => {
+      this.game.souls += 1e9;
+      this.game.save();
+      this.refresh();
+    });
+
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
