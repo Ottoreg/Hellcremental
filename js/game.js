@@ -732,34 +732,46 @@ class Game {
     const w = Iso.toScreen(a.gx, a.gy);
     const p = this.cam.worldToScreen(w.x, w.y);
     const scale = this.cam.scale;
-    const emoji = a.isDemon ? '😈' : a.isDemolisher ? '👹' : '👿';
-    const base = a.isDemon ? 34 : a.isDemolisher ? 44 : 24; // le colosse est plus grand
-    const size = Math.round(base * scale);
+
+    // Apparence par type : jeton coloré (disque + anneau) + emoji bien visible.
+    const cfg = a.isDemon
+      ? { emoji: '😈', r: 21, esize: 30, ring: '#ff8a2a', fill: '#7a1810', glow: '255,90,20' }
+      : a.isDemolisher
+      ? { emoji: '👹', r: 28, esize: 40, ring: '#c07bff', fill: '#3d1257', glow: '160,70,230' }
+      : { emoji: '👿', r: 15, esize: 22, ring: '#a86bff', fill: '#2c1442', glow: '150,90,255' };
+
     const bobY = Math.sin(a.bob) * 2.5 * scale;
     const lungeY = a.lunge * 6 * scale;
+    const cx = p.x;
+    const cy = p.y - 16 * scale + bobY - lungeY;
+    const R = cfg.r * scale;
 
-    // Ombre.
-    const shW = a.isDemon ? 15 : a.isDemolisher ? 19 : 11;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    // Ombre portée au sol.
+    ctx.fillStyle = 'rgba(0,0,0,0.34)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + 2 * scale, shW * scale, (shW / 2) * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y + 2 * scale, cfg.r * 0.8 * scale, cfg.r * 0.4 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Aura (démon : rouge ; démolisseur : violet).
-    if (a.isDemon || a.isDemolisher) {
-      const rad = (a.isDemolisher ? 32 : 26) * scale;
-      const grd = ctx.createRadialGradient(p.x, p.y - 16 * scale, 2, p.x, p.y - 16 * scale, rad);
-      const col = a.isDemolisher ? '150,40,220' : '255,60,0';
-      grd.addColorStop(0, `rgba(${col},0.38)`);
-      grd.addColorStop(1, `rgba(${col},0)`);
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - 16 * scale, rad, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Halo lumineux.
+    const glow = ctx.createRadialGradient(cx, cy, R * 0.4, cx, cy, R * 2);
+    glow.addColorStop(0, `rgba(${cfg.glow},0.5)`);
+    glow.addColorStop(1, `rgba(${cfg.glow},0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 2, 0, Math.PI * 2); ctx.fill();
 
-    ctx.font = `${size}px serif`;
+    // Jeton : disque plein dégradé + anneau vif.
+    const disc = ctx.createRadialGradient(cx, cy - R * 0.35, R * 0.2, cx, cy, R);
+    disc.addColorStop(0, cfg.fill);
+    disc.addColorStop(1, '#140709');
+    ctx.fillStyle = disc;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = Math.max(1.5, 2.4 * scale);
+    ctx.strokeStyle = cfg.ring;
+    ctx.stroke();
+
+    // Emoji du personnage, centré sur le jeton.
+    ctx.font = `${Math.round(cfg.esize * scale)}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, p.x, p.y - 16 * scale + bobY - lungeY);
+    ctx.fillText(cfg.emoji, cx, cy);
   }
 }
