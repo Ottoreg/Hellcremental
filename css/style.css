@@ -457,7 +457,9 @@ html, body {
 /* --- Mobile : deux vues plein écran (jeu / boutique) + onglets en bas --- */
 /* Le mode « deux vues » vise les téléphones : petit écran en largeur (portrait)
    OU en hauteur (paysage — un téléphone couché dépasse souvent 860px de large). */
-@media (max-width: 860px), (max-height: 600px) {
+/* Deux pages distinctes (jeu / pouvoirs) sur TOUS les formats, PC compris :
+   on n'affiche qu'une vue à la fois et on bascule via la barre d'onglets. */
+@media all {
   #main { position: relative; flex-direction: column; }
 
   /* Le jeu et la boutique occupent chacun tout l'espace ; on en affiche un seul. */
@@ -584,7 +586,7 @@ html, body {
 }
 
 /* L'arbre occupe tout l'espace disponible de la vue Pouvoirs. */
-@media (max-width: 860px), (max-height: 600px) {
+@media all {
   #shop { display: flex; flex-direction: column; }
   #skilltree { flex: 1; }
 }

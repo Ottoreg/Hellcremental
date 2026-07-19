@@ -22,7 +22,9 @@ class UI {
     this.bind();
   }
 
-  isMobile() { return this.mq.matches; }
+  // Le jeu est désormais en « deux pages » sur tous les formats (PC compris) :
+  // on considère toujours l'agencement à vue unique + barre d'onglets.
+  isMobile() { return true; }
 
   bind() {
     this.$('start-btn').addEventListener('click', () => this.startRun());
