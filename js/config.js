@@ -411,12 +411,12 @@ const SKILL_TREE = [
   { id: 'cataclysme',  x: 560, y: 105, parent: 'griffes' },
   { id: 'frenesie',    x: 360, y: 185, parent: 'griffes' },
   { id: 'souffle',     x: 760, y: 185, parent: 'griffes' },
-  // Vélocité + longévités : rangée horizontale, les longévités alignées à
-  // gauche du pacte de vélocité (au lieu de descendre en cascade).
-  { id: 'pattes',      x: 490, y: 545, parent: 'root' },
-  { id: 'longevite1',  x: 360, y: 545, parent: 'pattes' },
-  { id: 'longevite2',  x: 230, y: 545, parent: 'longevite1' },
-  { id: 'longevite3',  x: 100, y: 545, parent: 'longevite2' },
+  // Vélocité + longévités : remontées dans l'espace vide à gauche, disposées
+  // en zigzag (dents de scie) plutôt qu'en rangée plate.
+  { id: 'pattes',      x: 430, y: 470, parent: 'root' },
+  { id: 'longevite1',  x: 320, y: 360, parent: 'pattes' },
+  { id: 'longevite2',  x: 210, y: 470, parent: 'longevite1' },
+  { id: 'longevite3',  x: 100, y: 360, parent: 'longevite2' },
   { id: 'recolte',     x: 765, y: 440, parent: 'root' },
   { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
