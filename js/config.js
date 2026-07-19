@@ -406,15 +406,17 @@ const TREE_H = 1320;
 const SKILL_TREE = [
   { id: 'root',        x: 560, y: 430 },                   // le démon (non achetable)
   // Serment du Chaos : lève l'exclusivité des voies (accessible dès le départ).
-  { id: 'pacte_libre', x: 555, y: 600, parent: 'root' },
+  { id: 'pacte_libre', x: 555, y: 660, parent: 'root' },
   { id: 'griffes',     x: 560, y: 260, parent: 'root' },
   { id: 'cataclysme',  x: 560, y: 105, parent: 'griffes' },
   { id: 'frenesie',    x: 360, y: 185, parent: 'griffes' },
   { id: 'souffle',     x: 760, y: 185, parent: 'griffes' },
-  { id: 'pattes',      x: 355, y: 440, parent: 'root' },
-  { id: 'longevite1',  x: 240, y: 585, parent: 'pattes' },
-  { id: 'longevite2',  x: 130, y: 690, parent: 'longevite1' },
-  { id: 'longevite3',  x: 235, y: 795, parent: 'longevite2' },
+  // Vélocité + longévités : rangée horizontale, les longévités alignées à
+  // gauche du pacte de vélocité (au lieu de descendre en cascade).
+  { id: 'pattes',      x: 490, y: 545, parent: 'root' },
+  { id: 'longevite1',  x: 360, y: 545, parent: 'pattes' },
+  { id: 'longevite2',  x: 230, y: 545, parent: 'longevite1' },
+  { id: 'longevite3',  x: 100, y: 545, parent: 'longevite2' },
   { id: 'recolte',     x: 765, y: 440, parent: 'root' },
   { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
