@@ -437,7 +437,8 @@ const SKILL_TREE = [
   { id: 'foudroyeur_rate',  x: 1090, y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
   { id: 'foudroyeur_trait', x: 930,  y: 1245, parent: 'foudroyeur', req: 1 },
   // Trait des Esprits Serviteurs : traque des prêtres (réservé à la Voie des Légions).
-  { id: 'chasse_pretres', x: 740, y: 560, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
+  // Placé en haut à droite du pacte des Esprits Serviteurs.
+  { id: 'chasse_pretres', x: 1010, y: 415, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
 
   // Voie de la Magie (exclusive) — prolonge la branche du feu.
   { id: 'voie_magie',  x: 960, y: 165, parent: 'souffle', req: 1, group: 'voie' },
