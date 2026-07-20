@@ -133,8 +133,26 @@ class UI {
     this.setView('game');
     this.introPage = 0;
     this.renderIntro();
+    this.renderVirtueTracker();
     this.$('start-screen').classList.remove('hidden');
     this.refresh();
+  }
+
+  /* Suivi méta : Vertus vaincues (boss de dizaine) + éveil du Prestige. */
+  renderVirtueTracker() {
+    const el = this.$('virtue-tracker');
+    if (!el) return;
+    const g = this.game;
+    const done = g.virtuesDefeatedCount();
+    if (done === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const pips = VIRTUES.map((v) =>
+      `<span class="vt-pip ${g.virtuesDefeated[v.id] ? 'on' : ''}" title="${v.name}">${g.virtuesDefeated[v.id] ? v.emoji : '·'}</span>`
+    ).join('');
+    const prestige = g.prestigeUnlocked()
+      ? `<div class="vt-prestige">✨ Prestige éveillé <small>(à venir)</small></div>` : '';
+    el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
+      `<div class="vt-pips">${pips}</div>${prestige}`;
   }
 
   /* Bascule entre la vue jeu et la vue boutique (mobile). */
@@ -799,6 +817,25 @@ class UI {
         </div>
         <p class="ov-hint">Renforce-toi avec les âmes récoltées, puis retente ta damnation.</p>`;
       btn.textContent = `😈 Relancer le niveau ${r.level} ▸`;
+    }
+    // Vertu vaincue ce niveau (boss de dizaine) + éveil éventuel du Prestige.
+    const g = this.game;
+    if (g.justDefeatedVirtue) {
+      const v = VIRTUES.find((x) => x.id === g.justDefeatedVirtue);
+      const count = g.virtuesDefeatedCount();
+      const note = document.createElement('div');
+      note.className = 'ov-virtue';
+      note.innerHTML = `⚜️ Vertu vaincue : <b>${v.emoji} ${v.name}</b>` +
+        ` <span>— ${count}/${VIRTUES.length} Vertus tombées</span>`;
+      body.appendChild(note);
+      if (g.justUnlockedPrestige) {
+        const pr = document.createElement('div');
+        pr.className = 'ov-prestige';
+        pr.innerHTML = `✨ Les 7 Vertus sont anéanties !<br>` +
+          `<b>Le Prestige s'éveille.</b> Bientôt, tu pourras incarner un démon ` +
+          `primordial pour affronter les Archanges.`;
+        body.appendChild(pr);
+      }
     }
     // Bouton secondaire « Améliorer » : utile sur mobile (l'arbre est un autre onglet).
     this.$('overlay-improve').classList.toggle('hidden', !mobile);
