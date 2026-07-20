@@ -59,6 +59,32 @@ const PRIEST_DRAIN = 0.3;   // chaque prêtre accélère l'exorcisme de +30%
 function isBossLevel(level) { return level % 10 === 0; }
 
 /* -------------------------------------------------------------------------
+ * Les 7 Vertus — boss de chaque dizaine (niveaux 10, 20, … 70). Chacune
+ * s'oppose à un péché capital (donc à un démon primordial). Une fois les
+ * 7 Vertus vaincues, le système de Prestige s'éveille (développé plus tard :
+ * incarner un démon primordial pour affronter les Archanges méga-boss).
+ * ------------------------------------------------------------------------- */
+const VIRTUES = [
+  { id: 'humilite',      name: 'Humilité',      sin: 'orgueil',     emoji: '🕊️', hp: 240, value: 200 },
+  { id: 'charite',       name: 'Charité',       sin: 'avarice',     emoji: '🤲', hp: 260, value: 230 },
+  { id: 'chastete',      name: 'Chasteté',      sin: 'luxure',      emoji: '💠', hp: 280, value: 260 },
+  { id: 'bienveillance', name: 'Bienveillance', sin: 'envie',       emoji: '🤝', hp: 300, value: 290 },
+  { id: 'temperance',    name: 'Tempérance',    sin: 'gourmandise', emoji: '⚖️', hp: 320, value: 320 },
+  { id: 'patience',      name: 'Patience',      sin: 'colere',      emoji: '🧘', hp: 340, value: 350 },
+  { id: 'diligence',     name: 'Diligence',     sin: 'paresse',     emoji: '🐝', hp: 360, value: 380 },
+];
+// Injecte chaque Vertu comme type de cible « boss vivant ».
+for (const v of VIRTUES) {
+  TARGET_TYPES['virtue_' + v.id] = { name: v.name, emoji: v.emoji, hp: v.hp, value: v.value, living: true, virtue: v.id };
+}
+/* Renvoie la Vertu servant de boss pour ce niveau (10→1re … 70→7e), sinon null. */
+function virtueForLevel(level) {
+  if (level % 10 !== 0) return null;
+  const tier = level / 10;
+  return (tier >= 1 && tier <= VIRTUES.length) ? VIRTUES[tier - 1] : null;
+}
+
+/* -------------------------------------------------------------------------
  * Palettes de niveaux : quels types apparaissent, et à quelle fréquence.
  * On débloque des types plus coriaces au fil de la progression.
  * ------------------------------------------------------------------------- */

@@ -18,6 +18,7 @@ class Game {
     this.level = 1;
     this.upgrades = {};        // id -> niveau acheté
     this.offerings = {};       // démon primordial -> nombre d'offrandes faites
+    this.virtuesDefeated = {}; // vertu (boss de dizaine) -> vaincue
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
@@ -71,6 +72,7 @@ class Game {
       level: this.level,
       upgrades: this.upgrades,
       offerings: this.offerings,
+      virtuesDefeated: this.virtuesDefeated,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -123,6 +125,7 @@ class Game {
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
     this.offerings = d.offerings || {};
+    this.virtuesDefeated = d.virtuesDefeated || {};
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
@@ -143,6 +146,7 @@ class Game {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
+    this.virtuesDefeated = {};
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -224,6 +228,12 @@ class Game {
     this.onChange();
     return true;
   }
+
+  /* ---------------------- Vertus & Prestige ---------------------- */
+  virtuesDefeatedCount() { return VIRTUES.filter(v => this.virtuesDefeated[v.id]).length; }
+  allVirtuesDefeated() { return VIRTUES.every(v => this.virtuesDefeated[v.id]); }
+  /* Le Prestige s'éveille une fois les 7 Vertus vaincues (mécanique à venir). */
+  prestigeUnlocked() { return this.allVirtuesDefeated(); }
 
   /* Parent d'un pacte dans l'arbre (null pour les branches issues du démon). */
   parentOf(id) {
@@ -340,9 +350,11 @@ class Game {
         used.add(x + ',' + y);
       };
 
-      // Boss au centre (tous les 10 niveaux).
+      // Boss au centre (tous les 10 niveaux). Aux dizaines 10→70 c'est une
+      // des 7 Vertus ; au-delà, on retombe sur les boss génériques.
       if (boss) {
-        const bid = BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
+        const v = virtueForLevel(level);
+        const bid = v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
         push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
       }
 
@@ -385,7 +397,7 @@ class Game {
 
     this.targets = rawTargets.map(t => {
       const priest = t.typeId === 'pretre';
-      const boss = typeof t.typeId === 'string' && t.typeId.startsWith('boss_');
+      const boss = typeof t.typeId === 'string' && (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_'));
       return {
         gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
         hp: t.hp, maxHp: t.maxHp, value: t.value,
@@ -410,6 +422,8 @@ class Game {
     this.clickBuff = 0;
     this.clickBuffMult = 1;
     this.clickBuffRadius = 0;
+    this.justDefeatedVirtue = null;   // événements de la vie en cours (écran de fin)
+    this.justUnlockedPrestige = false;
     this.abilityCooldowns = {};
     this.abilityUsed = {};
     this.attackers = [];
@@ -942,6 +956,12 @@ class Game {
   destroyTarget(t) {
     if (t.dead) return;
     t.dead = true; t.deathT = 0.5;
+    // Une Vertu (boss de dizaine) abattue : on la marque comme vaincue.
+    if (t.def && t.def.virtue && !this.virtuesDefeated[t.def.virtue]) {
+      this.virtuesDefeated[t.def.virtue] = true;
+      this.justDefeatedVirtue = t.def.virtue; // pour l'écran de fin
+      if (this.allVirtuesDefeated()) this.justUnlockedPrestige = true;
+    }
     const gain = Math.max(1, Math.round(t.value * this.stats.soulMult));
     this.souls += gain;
     this.runSouls += gain;
