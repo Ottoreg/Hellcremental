@@ -145,9 +145,24 @@
           </div>
         </div>
       </aside>
+
+      <!-- Autel des Démons Primordiaux : offrandes d'âmes (hors niveau) -->
+      <section id="altar">
+        <div class="altar-head">
+          <h2>🩸 Autel des Démons Primordiaux</h2>
+          <p>Offre des âmes aux sept péchés capitaux pour arracher leurs pactes.</p>
+        </div>
+        <div id="demon-carousel">
+          <button class="carousel-arrow" id="demon-prev" aria-label="Démon précédent">‹</button>
+          <div class="demon-stage" id="demon-stage"></div>
+          <button class="carousel-arrow" id="demon-next" aria-label="Démon suivant">›</button>
+        </div>
+        <div class="demon-dots" id="demon-dots"></div>
+        <canvas id="altar-fx"></canvas>
+      </section>
     </main>
 
-    <!-- Barre d'onglets (mobile) : bascule entre jeu et boutique -->
+    <!-- Barre d'onglets : bascule entre jeu, pouvoirs et autel -->
     <nav id="mobile-nav">
       <div id="nav-timer" aria-hidden="true"><div id="nav-timer-fill"></div></div>
       <button class="nav-btn active" data-view="game">
@@ -156,6 +171,10 @@
       <button class="nav-btn" data-view="shop">
         <span class="nav-ico nav-cross">✝️</span><span class="nav-lbl">Pouvoirs</span>
         <span id="nav-shop-badge" class="nav-badge hidden"></span>
+      </button>
+      <button class="nav-btn" data-view="altar">
+        <span class="nav-ico">🩸</span><span class="nav-lbl">Autel</span>
+        <span id="nav-altar-badge" class="nav-badge hidden"></span>
       </button>
     </nav>
 

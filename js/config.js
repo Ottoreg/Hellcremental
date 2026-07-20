@@ -461,3 +461,59 @@ const SKILL_TREE = [
   { id: 'nappe_feu',   x: 205, y: 170, parent: 'voie_clic', req: 1 },
   { id: 'finisher',    x: 140, y: 75,  parent: 'clic_demon', req: 1 },
 ];
+
+/* -------------------------------------------------------------------------
+ * Démons primordiaux — offrandes d'âmes (un démon par péché capital).
+ * On offre des âmes à un démon ; au bout de OFFERINGS_PER_DEMON offrandes son
+ * « pacte capital » se scelle et applique un bonus permanent lié à son péché.
+ * Le coût d'une offrande dépend de la progression GLOBALE : chaque offrande
+ * faite (à n'importe quel démon) renchérit toutes les offrandes suivantes.
+ * ------------------------------------------------------------------------- */
+const OFFERINGS_PER_DEMON = 10;   // offrandes nécessaires pour sceller un pacte
+const OFFERING_BASE = 1500;       // coût de la toute première offrande
+const OFFERING_GROWTH = 1.27;     // facteur d'escalade par offrande globale
+
+const PRIMORDIAL_DEMONS = [
+  {
+    id: 'orgueil', sin: 'Orgueil', name: 'Lucifer', emoji: '👑', color: '#e8c84d',
+    pact: 'Superbe Infernale',
+    desc: 'Ta superbe démesurée décuple ta force : +100% de dégâts de base.',
+    apply: (s) => { s.damage *= 2; },
+  },
+  {
+    id: 'avarice', sin: 'Avarice', name: 'Mammon', emoji: '🪙', color: '#f0b429',
+    pact: 'Cupidité Sans Fond',
+    desc: 'Ton avidité aspire les âmes : +150% d\'âmes récoltées.',
+    apply: (s) => { s.soulMult *= 2.5; },
+  },
+  {
+    id: 'luxure', sin: 'Luxure', name: 'Asmodée', emoji: '💋', color: '#e0457b',
+    pact: 'Étreinte Vorace',
+    desc: 'Un désir frénétique presse tes coups : cadence d\'attaque +80%.',
+    apply: (s) => { s.attackInterval *= 0.55; },
+  },
+  {
+    id: 'envie', sin: 'Envie', name: 'Léviathan', emoji: '🐍', color: '#3fb27f',
+    pact: 'Convoitise Mortelle',
+    desc: 'Tu convoites la vie des mortels : chaque destruction prolonge ta longévité de +0,4 s.',
+    apply: (s) => { s.envyLife += 0.4; },
+  },
+  {
+    id: 'gourmandise', sin: 'Gourmandise', name: 'Belzébuth', emoji: '🪰', color: '#8bbf3f',
+    pact: 'Appétit Dévorant',
+    desc: 'Tu dévores tout alentour : +150% de dégâts de zone.',
+    apply: (s) => { s.splash += 1.5; },
+  },
+  {
+    id: 'colere', sin: 'Colère', name: 'Satan', emoji: '👿', color: '#e8442b',
+    pact: 'Fureur Déchaînée',
+    desc: 'Une rage aveugle t\'anime : +90% de vitesse de déplacement et +40% de dégâts.',
+    apply: (s) => { s.moveSpeed *= 1.9; s.damage *= 1.4; },
+  },
+  {
+    id: 'paresse', sin: 'Paresse', name: 'Belphégor', emoji: '🦥', color: '#6a8caf',
+    pact: 'Torpeur Éternelle',
+    desc: 'Le temps s\'alanguit autour de toi : l\'exorcisme est ralenti de 35%.',
+    apply: (s) => { s.slothSlow = Math.max(s.slothSlow, 0.35); },
+  },
+];

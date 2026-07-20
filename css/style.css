@@ -457,24 +457,25 @@ html, body {
 /* --- Mobile : deux vues plein écran (jeu / boutique) + onglets en bas --- */
 /* Le mode « deux vues » vise les téléphones : petit écran en largeur (portrait)
    OU en hauteur (paysage — un téléphone couché dépasse souvent 860px de large). */
-/* Deux pages distinctes (jeu / pouvoirs) sur TOUS les formats, PC compris :
-   on n'affiche qu'une vue à la fois et on bascule via la barre d'onglets. */
+/* Trois pages distinctes (jeu / pouvoirs / autel) sur TOUS les formats, PC
+   compris : on n'affiche qu'une vue à la fois et on bascule via la barre. */
 @media all {
   #main { position: relative; flex-direction: column; }
 
-  /* Le jeu et la boutique occupent chacun tout l'espace ; on en affiche un seul. */
-  #stage, #shop {
+  /* Chaque vue occupe tout l'espace ; on n'en affiche qu'une seule. */
+  #stage, #shop, #altar {
     position: absolute; inset: 0; width: 100%; height: 100%;
     flex: none; border: none;
   }
   #shop { border-left: none; }
-  #app[data-view="shop"] #stage { display: none; }
-  #app[data-view="game"] #shop { display: none; }
+  /* Affiche la vue active, masque les autres (sélecteurs à forte spécificité). */
+  #app[data-view="game"]  #shop, #app[data-view="game"]  #altar { display: none; }
+  #app[data-view="shop"]  #stage, #app[data-view="shop"]  #altar { display: none; }
+  #app[data-view="altar"] #stage, #app[data-view="altar"] #shop  { display: none; }
+  #app[data-view="altar"] #altar { display: flex; }
 
-  /* Encoche/caméra : on éloigne le contenu de la boutique des bords.
-     (Le HUD, les overlays et les onglets gèrent leur propre marge ; la grille
-     du jeu est centrée et n'atteint pas les bords.) */
-  #shop { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  /* Encoche/caméra : on éloigne le contenu des bords. */
+  #shop, #altar { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 
   .stats { gap: 6px; }
   .stat { min-width: 58px; padding: 5px 8px; }
@@ -592,3 +593,83 @@ html, body {
 }
 
 .nav-badge.hidden, #run-control.hidden { display: none !important; }
+
+/* ============================ Autel des Démons ============================ */
+#altar {
+  flex-direction: column; align-items: center;
+  background:
+    radial-gradient(ellipse at 50% 22%, #2a0d12 0%, #0c0608 72%),
+    repeating-linear-gradient(45deg, #0c0608 0 24px, #120709 24px 48px);
+  overflow: hidden;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-bottom: 10px;
+}
+.altar-head { text-align: center; padding: 10px 16px 4px; }
+.altar-head h2 { font-family: Georgia, serif; font-size: 20px; color: var(--ember-2); }
+.altar-head p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+#demon-carousel {
+  flex: 1; width: 100%; max-width: 720px; min-height: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 4px 6px;
+}
+.carousel-arrow {
+  flex: none; width: 46px; height: 46px; border-radius: 50%;
+  background: rgba(30,14,18,.8); border: 2px solid var(--border); color: #f3d9c6;
+  font-size: 26px; line-height: 1; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s, border-color .2s, background .2s;
+}
+.carousel-arrow:hover { border-color: var(--ember-2); }
+.carousel-arrow:active { transform: scale(.9); }
+
+.demon-stage { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
+.demon-card {
+  position: relative; width: 100%; max-width: 400px; height: 100%; max-height: 460px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 18px 20px; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(28,14,18,.92), rgba(14,8,10,.95));
+  border: 2px solid var(--demon-color, #7a3b18);
+  box-shadow: 0 0 34px -6px var(--demon-color, #7a3b18), inset 0 0 40px -20px var(--demon-color, #7a3b18);
+}
+.demon-sin { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--demon-color, #e0b070); font-weight: bold; }
+.demon-art {
+  font-size: 92px; line-height: 1; margin: 2px 0;
+  filter: drop-shadow(0 0 18px var(--demon-color, #7a3b18));
+  transition: transform .15s;
+}
+.demon-art.gulp { animation: demonGulp .45s ease; }
+@keyframes demonGulp { 0%{transform:scale(1)} 35%{transform:scale(1.16)} 60%{transform:scale(.94)} 100%{transform:scale(1)} }
+.demon-name { font-family: Georgia, serif; font-size: 22px; color: #fff; }
+.demon-pact { font-size: 13px; font-weight: bold; color: var(--demon-color, #e0b070); }
+.demon-desc { font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.45; max-width: 320px; }
+
+.demon-progress {
+  width: 100%; max-width: 300px; height: 12px; border-radius: 7px;
+  background: rgba(0,0,0,.5); border: 1px solid var(--border); overflow: hidden; margin-top: 2px;
+}
+.demon-progress > span { display: block; height: 100%; background: var(--demon-color, #c1121f); transition: width .35s; }
+.demon-progress-lbl { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.demon-offer {
+  margin-top: 6px; padding: 12px 22px; border-radius: 14px; cursor: pointer;
+  border: none; color: #1a0a0d; font-weight: bold; font-size: 15px; letter-spacing: .3px;
+  background: linear-gradient(180deg, var(--demon-color, #e0b070), #b46a2a);
+  box-shadow: 0 6px 0 -2px rgba(0,0,0,.45);
+  transition: transform .1s, filter .2s, opacity .2s;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.demon-offer small { font-weight: normal; font-size: 11px; opacity: .85; }
+.demon-offer:active { transform: translateY(2px); }
+.demon-offer:disabled { cursor: default; filter: grayscale(.7) brightness(.7); opacity: .8; box-shadow: none; }
+.demon-offer.sealed { background: linear-gradient(180deg, #6fae6f, #3c7a3c); color: #06210b; }
+
+.demon-dots { display: flex; gap: 8px; justify-content: center; padding: 6px 0 2px; flex-wrap: wrap; }
+.demon-dots span {
+  width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.22);
+  cursor: pointer; transition: transform .15s, background .2s; font-size: 0;
+}
+.demon-dots span.on { transform: scale(1.15); }
+.demon-dots span.sealed { box-shadow: 0 0 8px rgba(123,212,123,.8); }
+
+#altar-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
