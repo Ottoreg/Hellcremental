@@ -701,3 +701,8 @@ html, body {
 .vt-pip.on { border-color: rgba(255,210,100,.6); box-shadow: 0 0 8px rgba(255,200,80,.35); }
 .vt-prestige { margin-top: 8px; font-size: 12px; color: #d9b3ff; font-weight: bold; }
 .vt-prestige small { color: var(--muted); font-weight: normal; }
+
+/* Ligne HUD : biome courant + indicateur de renaissance des vivants. */
+.hud-biome b { color: #bfe0a8; font-family: Georgia, serif; font-weight: bold; }
+.hud-respawn b { color: #9be89b; }
+.hud-respawn .hud-ico { color: #9be89b; animation: pulseLow 1.4s ease-in-out infinite; }

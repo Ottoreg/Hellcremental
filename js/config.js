@@ -17,7 +17,7 @@ const CONFIG = {
 
   // --- Génération de niveau ---
   GRID_MIN: 5,
-  GRID_MAX: 13,
+  GRID_MAX: 16,
 };
 
 /* -------------------------------------------------------------------------
@@ -40,6 +40,21 @@ const TARGET_TYPES = {
   eglise:     { name: 'Chapelle',     emoji: '⛪', hp: 120, value: 40, living: false },
   statue:     { name: 'Statue sainte',emoji: '🗿', hp: 160, value: 55, living: false },
   chevalier:  { name: 'Paladin',      emoji: '🛡️', hp: 90,  value: 45, living: true  },
+
+  // --- Cibles urbaines (biomes Ville → Métropole) ---
+  citadin:    { name: 'Citadin',      emoji: '🚶', hp: 16,  value: 15, living: true  },
+  employe:    { name: 'Employé',      emoji: '🧑‍💼', hp: 20, value: 20, living: true  },
+  policier:   { name: 'Policier',     emoji: '👮', hp: 110, value: 55, living: true  },
+  voiture:    { name: 'Voiture',      emoji: '🚗', hp: 45,  value: 14, living: false },
+  bus:        { name: 'Bus',          emoji: '🚌', hp: 80,  value: 24, living: false },
+  boutique:   { name: 'Boutique',     emoji: '🏪', hp: 95,  value: 28, living: false },
+  immeuble:   { name: 'Immeuble',     emoji: '🏢', hp: 150, value: 36, living: false },
+  usine:      { name: 'Usine',        emoji: '🏭', hp: 210, value: 50, living: false },
+  hopital:    { name: 'Hôpital',      emoji: '🏥', hp: 250, value: 64, living: false },
+  hotel:      { name: 'Hôtel',        emoji: '🏨', hp: 200, value: 52, living: false },
+  banque:     { name: 'Banque',       emoji: '🏦', hp: 240, value: 72, living: false },
+  gratteciel: { name: 'Gratte-ciel',  emoji: '🏬', hp: 340, value: 92, living: false },
+  tour:       { name: 'Tour',         emoji: '🗼', hp: 300, value: 88, living: false },
 
   // Prêtre : prie pour exorciser le démon plus vite (draine sa durée de vie).
   pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true  },
@@ -85,17 +100,38 @@ function virtueForLevel(level) {
 }
 
 /* -------------------------------------------------------------------------
- * Palettes de niveaux : quels types apparaissent, et à quelle fréquence.
- * On débloque des types plus coriaces au fil de la progression.
+ * Biomes : les 70 premiers niveaux traversent 7 zones (10 niveaux chacune),
+ * de la campagne à la métropole, chacune avec ses cibles et sa couleur de sol.
+ * Au-delà du niveau 70, un biome est tiré au hasard (déterministe par graine).
  * ------------------------------------------------------------------------- */
-const LEVEL_THEMES = [
-  { name: 'Prairie paisible',  min: 1,  pool: { buisson: 5, fleur: 4, arbre: 3, mouton: 2 } },
-  { name: 'Ferme prospère',    min: 3,  pool: { arbre: 3, mouton: 3, vache: 3, buisson: 2, maison: 1 } },
-  { name: 'Hameau pieux',      min: 6,  pool: { maison: 3, villageois: 4, puits: 2, arbre: 2, rocher: 2 } },
-  { name: 'Village fortifié',  min: 10, pool: { maison: 3, villageois: 3, rocher: 3, chevalier: 2, eglise: 1 } },
-  { name: 'Cité sainte',       min: 15, pool: { eglise: 2, statue: 2, chevalier: 3, maison: 2, villageois: 3 } },
-  { name: 'Bastion céleste',   min: 22, pool: { statue: 3, eglise: 3, chevalier: 4, puits: 2 } },
+const BIOMES = [
+  { id: 'campagne',    name: 'Campagne',      ground: ['#3d5a3a', '#456a41'],
+    pool: { buisson: 5, fleur: 4, arbre: 4, mouton: 3, vache: 2, rocher: 1 } },
+  { id: 'hameau',      name: 'Petit Hameau',  ground: ['#4a5a38', '#556740'],
+    pool: { maison: 2, villageois: 3, mouton: 2, arbre: 3, puits: 2, buisson: 2, vache: 1 } },
+  { id: 'village',     name: 'Village',       ground: ['#57543a', '#635f42'],
+    pool: { maison: 3, villageois: 3, puits: 2, eglise: 1, arbre: 2, chevalier: 1, rocher: 1 } },
+  { id: 'petiteville', name: 'Petite Ville',  ground: ['#4f4a44', '#5a544d'],
+    pool: { maison: 3, boutique: 2, citadin: 3, voiture: 2, eglise: 1, villageois: 2, statue: 1 } },
+  { id: 'ville',       name: 'Ville',         ground: ['#494a50', '#53545b'],
+    pool: { immeuble: 3, boutique: 2, citadin: 3, voiture: 2, policier: 1, hotel: 1, bus: 1, employe: 1 } },
+  { id: 'grandeville', name: 'Grande Ville',  ground: ['#44464d', '#4d4f57'],
+    pool: { immeuble: 3, hopital: 1, banque: 1, citadin: 3, policier: 2, voiture: 2, usine: 1, bus: 1, employe: 2 } },
+  { id: 'metropole',   name: 'Métropole',     ground: ['#3d3f47', '#474a53'],
+    pool: { gratteciel: 3, immeuble: 2, tour: 1, banque: 1, citadin: 3, policier: 2, voiture: 2, bus: 1, employe: 2, hopital: 1 } },
 ];
+
+/* Biome d'un niveau : 1→7 en zones fixes (10 niveaux), aléatoire ensuite. */
+function biomeForLevel(level, seed) {
+  if (level <= 70) return BIOMES[Math.min(BIOMES.length - 1, Math.ceil(level / 10) - 1)];
+  const r = seededRandom(seed || 0, level, 4242)();
+  return BIOMES[Math.floor(r * BIOMES.length)];
+}
+
+/* Respawn : à partir du niveau 31, les entités vivantes non achevées
+ * réapparaissent lentement — il faut tout tuer assez vite pour finir. */
+const RESPAWN_MIN_LEVEL = 31;
+const RESPAWN_DELAY = 8; // secondes avant réapparition d'une entité vivante
 
 /* -------------------------------------------------------------------------
  * Pouvoirs achetables (progression incrémentale, persistants entre les vies).
