@@ -316,20 +316,21 @@ class Game {
   }
 
   /* ---------------------- Génération de niveau ---------------------- */
-  pickThemeFor(level) {
-    let theme = LEVEL_THEMES[0];
-    for (const t of LEVEL_THEMES) if (level >= t.min) theme = t;
-    return theme;
+  /* Biome d'un niveau (déterministe par graine au-delà du niveau 70). */
+  biomeFor(level) { return biomeForLevel(level, this.seed); }
+  currentBiome() { return this.biome || this.biomeFor(this.level); }
+  /* Taille de grille : croissance lente (une case toutes les ~6 niveaux). */
+  gridSizeFor(level) {
+    return Math.min(CONFIG.GRID_MAX, CONFIG.GRID_MIN + Math.floor((level - 1) / 6));
   }
-  pickTheme() { return this.pickThemeFor(this.level); }
 
   /* Génère de façon DÉTERMINISTE la disposition d'un niveau à partir de la
    * graine du joueur. Le même (graine, niveau) produit toujours le même niveau,
    * ce qui rend la partie reproductible sur n'importe quel appareil.
    * Renvoie { gridSize, targets } (données brutes, sans état de rendu). */
   generateLevel(level) {
-    const theme = this.pickThemeFor(level);
-    const pool = this.buildWeightedPool(theme.pool);
+    const biome = this.biomeFor(level);
+    const pool = this.buildWeightedPool(biome.pool);
     const hpMult = 1 + (level - 1) * 0.35;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
@@ -340,7 +341,7 @@ class Game {
     // de cibles — le résultat reste identique sur tous les appareils.
     for (let attempt = 0; attempt < 12; attempt++) {
       const rand = seededRandom(this.seed, level, attempt);
-      const size = Math.min(CONFIG.GRID_MAX, CONFIG.GRID_MIN + Math.floor((level - 1) / 2));
+      const size = this.gridSizeFor(level);
       const used = new Set();
       const targets = [];
       const push = (x, y, typeId, hpFactor, valFactor) => {
@@ -386,6 +387,8 @@ class Game {
   /* Construit la grille + les cibles jouables à partir de données brutes. */
   buildRunState(gridSize, rawTargets, scorched) {
     this.gridSize = gridSize;
+    this.biome = this.biomeFor(this.level);                 // couleur de sol + thème
+    this.respawnActive = this.level >= RESPAWN_MIN_LEVEL;    // réapparition des vivants
     this.grid = [];
     for (let y = 0; y < gridSize; y++) {
       const row = [];
@@ -404,6 +407,7 @@ class Game {
         priest, drain: priest ? PRIEST_DRAIN : 0,
         boss, scale: boss ? BOSS_SCALE : 1,
         bob: Math.random() * Math.PI * 2, shake: 0, dead: false, deathT: 0,
+        respawnT: 0, // compte à rebours de réapparition (entités vivantes)
       };
     });
     for (const t of this.targets)
@@ -797,8 +801,19 @@ class Game {
     // Arc Éternel : arc permanent entre foudroyeurs qui brûle les cases traversées.
     this.updateFoudroyeurArc(dt, s);
 
-    // Progression : tout détruit -> niveau nettoyé.
-    if (this.runDestroyed >= this.totalToDestroy) this.endRun(true);
+    // Réapparition (niveaux 31+) : les entités vivantes abattues reviennent
+    // après un délai si le niveau n'est pas encore nettoyé.
+    if (this.respawnActive) {
+      for (const t of this.targets) {
+        if (t.dead && t.respawnT > 0) {
+          t.respawnT -= dt;
+          if (t.respawnT <= 0) this.reviveTarget(t);
+        }
+      }
+    }
+
+    // Progression : niveau nettoyé quand plus aucune cible n'est debout.
+    if (this.aliveTargetCount() === 0) this.endRun(true);
   }
 
   /* Onde de choc du Colosse (premier coup sur un bâtiment). */
@@ -956,6 +971,10 @@ class Game {
   destroyTarget(t) {
     if (t.dead) return;
     t.dead = true; t.deathT = 0.5;
+    // Réapparition (niveaux 31+) : une entité vivante ordinaire (ni boss ni
+    // prêtre) reviendra à la vie si on ne finit pas le niveau à temps.
+    t.respawnT = (this.respawnActive && t.def.living && !t.boss && !t.priest)
+      ? this.respawnDelay() : 0;
     // Une Vertu (boss de dizaine) abattue : on la marque comme vaincue.
     if (t.def && t.def.virtue && !this.virtuesDefeated[t.def.virtue]) {
       this.virtuesDefeated[t.def.virtue] = true;
@@ -977,6 +996,32 @@ class Game {
     this.addFloater(t.gx, t.gy, `+${gain}`, t.def.living ? '#ff6b9d' : '#ffcc4d');
     this.save();
     this.onChange();
+  }
+
+  /* Délai de réapparition (raccourcit un peu aux hauts niveaux). */
+  respawnDelay() {
+    return Math.max(5, RESPAWN_DELAY - Math.floor((this.level - RESPAWN_MIN_LEVEL) / 20));
+  }
+  /* Nombre de cibles encore debout (base de la condition de fin de niveau). */
+  aliveTargetCount() {
+    let n = 0;
+    for (const t of this.targets) if (!t.dead) n++;
+    return n;
+  }
+  /* Ramène une entité vivante à la vie (réapparition). */
+  reviveTarget(t) {
+    t.dead = false; t.deathT = 0; t.respawnT = 0;
+    t.hp = t.maxHp; t.shake = 0; t.bob = Math.random() * Math.PI * 2;
+    if (this.grid[t.gy] && this.grid[t.gy][t.gx]) this.grid[t.gy][t.gx].occupied = true;
+    this.addFloater(t.gx, t.gy, '↻', '#9be89b');
+    const w = this.worldOf(t);
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 60;
+      this.particles.push({
+        x: w.x, y: w.y - 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        g: 120, life: 0.4 + Math.random() * 0.3, color: '#9be89b', size: 2 + Math.random() * 2,
+      });
+    }
   }
 
   /* Clic infernal du joueur sur une case. */
@@ -1157,14 +1202,15 @@ class Game {
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // --- Sol : losanges ---
+    // --- Sol : losanges (couleur selon le biome) ---
+    const ground = (this.currentBiome() || {}).ground || ['#3d5a3a', '#456a41'];
     for (let y = 0; y < this.gridSize; y++) {
       for (let x = 0; x < this.gridSize; x++) {
         const w = Iso.toScreen(x, y);
         const p = cam.worldToScreen(w.x, w.y);
         const cell = this.grid[y][x];
         const dark = (x + y) % 2 === 0;
-        let fill = cell.scorched ? (dark ? '#2a1410' : '#33150f') : (dark ? '#3d5a3a' : '#456a41');
+        let fill = cell.scorched ? (dark ? '#2a1410' : '#33150f') : (dark ? ground[0] : ground[1]);
         const hovered = this.hover && this.hover.gx === x && this.hover.gy === y;
         this.diamondScaled(ctx, p.x, p.y, fill, 'rgba(0,0,0,0.25)');
         if (hovered) this.diamondScaled(ctx, p.x, p.y, 'rgba(168,85,247,0.28)', '#a855f7');

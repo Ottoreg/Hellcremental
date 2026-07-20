@@ -557,7 +557,14 @@ class UI {
     if (playing) {
       const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
       this.$('timer-text').textContent = g.timeLeft.toFixed(1) + 's';
-      this.$('progress-text').textContent = `${g.runDestroyed} / ${g.totalToDestroy}`;
+      // Progression fondée sur ce qui reste debout (régresse si des vivants renaissent).
+      const alive = g.aliveTargetCount();
+      const done = Math.max(0, g.totalToDestroy - alive);
+      this.$('progress-text').textContent = `${done} / ${g.totalToDestroy}`;
+      // Nom du biome + indicateur de renaissance.
+      const biome = g.currentBiome ? g.currentBiome() : null;
+      this.$('biome-text').textContent = biome ? biome.name : '';
+      this.$('hud-respawn').classList.toggle('hidden', !g.respawnActive);
       // Le compte à rebours s'affole dans les 5 dernières secondes.
       this.$('hud').classList.toggle('low', g.timeLeft <= 5);
       // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
@@ -569,6 +576,7 @@ class UI {
     } else {
       this.$('nav-timer-fill').style.width = '100%';
       this.$('hud-drain').classList.add('hidden');
+      this.$('hud-respawn').classList.add('hidden');
     }
 
     // Fiche de pacte ouverte : on la garde à jour (coût/abordable).
