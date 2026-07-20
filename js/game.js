@@ -1380,6 +1380,7 @@ class Game {
       // Effet de destruction : rétrécit et s'estompe.
       const k = t.deathT / 0.5;
       ctx.globalAlpha = k;
+      ctx.fillStyle = '#f4ecdd';
       ctx.font = `${Math.round(size * k)}px serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('💀', p.x, p.y - 10 * scale);
@@ -1408,6 +1409,12 @@ class Game {
       ctx.beginPath(); ctx.arc(p.x, cy, rad, 0, Math.PI * 2); ctx.fill();
     }
 
+    // Couleur de remplissage OPAQUE avant l'emoji : certains navigateurs (surtout
+    // PC) appliquent l'alpha du fillStyle aux emoji couleur — or il restait ici
+    // semi-transparent (l'ombre/aura), d'où des personnages « fantômes ». Une
+    // couleur opaque les rend nets (le RGB est ignoré pour les emoji couleur ;
+    // il sert de teinte de repli sur les navigateurs sans emoji couleur).
+    ctx.fillStyle = '#f4ecdd';
     ctx.font = `${size}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(t.def.emoji, p.x + shakeX, cy);
