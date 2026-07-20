@@ -17,6 +17,7 @@ class Game {
     this.souls = 0;
     this.level = 1;
     this.upgrades = {};        // id -> niveau acheté
+    this.offerings = {};       // démon primordial -> nombre d'offrandes faites
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
@@ -69,6 +70,7 @@ class Game {
       souls: this.souls,
       level: this.level,
       upgrades: this.upgrades,
+      offerings: this.offerings,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -120,6 +122,7 @@ class Game {
     this.souls = d.souls || 0;
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
+    this.offerings = d.offerings || {};
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
@@ -139,7 +142,7 @@ class Game {
   reset() {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
-    this.souls = 0; this.level = 1; this.upgrades = {};
+    this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -193,6 +196,33 @@ class Game {
   upgradeCost(def) {
     const n = this.upgradeLevel(def.id);
     return Math.floor(def.baseCost * Math.pow(def.mult, n));
+  }
+
+  /* ---------------------- Offrandes aux démons primordiaux ---------------------- */
+  offeringCount(id) { return this.offerings[id] || 0; }
+  totalOfferings() {
+    return PRIMORDIAL_DEMONS.reduce((t, d) => t + this.offeringCount(d.id), 0);
+  }
+  demonUnlocked(id) { return this.offeringCount(id) >= OFFERINGS_PER_DEMON; }
+  /* Coût de la PROCHAINE offrande : escalade avec le total d'offrandes faites. */
+  offeringCost() {
+    return Math.floor(OFFERING_BASE * Math.pow(OFFERING_GROWTH, this.totalOfferings()));
+  }
+  canOffer(id) {
+    return this.offeringCount(id) < OFFERINGS_PER_DEMON && this.souls >= this.offeringCost();
+  }
+  /* Offre une âme à un démon. Renvoie true si l'offrande a été acceptée. */
+  offerSouls(id) {
+    if (this.offeringCount(id) >= OFFERINGS_PER_DEMON) return false;
+    const cost = this.offeringCost();
+    if (this.souls < cost) return false;
+    this.souls -= cost;
+    this.offerings[id] = this.offeringCount(id) + 1;
+    // Applique à chaud le pacte capital s'il vient d'être scellé pendant une vie.
+    if (this.phase === 'playing') this.computeStats(false);
+    this.save();
+    this.onChange();
+    return true;
   }
 
   /* Parent d'un pacte dans l'arbre (null pour les branches issues du démon). */
@@ -253,11 +283,15 @@ class Game {
       meteore: 0, huntPriests: 0,
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
-      foudreDmg: 0, finisher: 0,
+      foudreDmg: 0, finisher: 0, envyLife: 0, slothSlow: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
       if (n > 0) def.apply(s, n);
+    }
+    // Pactes capitaux des démons primordiaux (offrandes complètes).
+    for (const dmn of PRIMORDIAL_DEMONS) {
+      if (this.demonUnlocked(dmn.id)) dmn.apply(s);
     }
     // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
     s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
@@ -638,7 +672,9 @@ class Game {
     let drain = 0;
     for (const t of this.targets) if (!t.dead && t.priest) drain += t.drain;
     this.priestDrain = drain;
-    this.timeLeft -= dt * (1 + drain);
+    // Torpeur Éternelle (Belphégor) : ralentit l'écoulement de l'exorcisme.
+    const slow = this.stats.slothSlow || 0;
+    this.timeLeft -= dt * (1 + drain) * (1 - slow);
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
     this.throttledSave(dt); // persiste régulièrement la partie en cours
 
@@ -911,6 +947,8 @@ class Game {
     this.runSouls += gain;
     this.runDestroyed++;
     this.totalDestroyed++;
+    // Convoitise Mortelle (Léviathan) : chaque destruction prolonge la survie.
+    if (this.stats.envyLife > 0 && this.phase === 'playing') this.timeLeft += this.stats.envyLife;
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) {
       this.grid[t.gy][t.gx].scorched = true;
       this.grid[t.gy][t.gx].occupied = false;

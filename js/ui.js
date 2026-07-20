@@ -19,6 +19,9 @@ class UI {
     // Présentation paginée.
     this.introPage = 0;
     this.introCount = 0;
+    // Autel des démons primordiaux.
+    this.altarBuilt = false;
+    this.demonIndex = 0;
     this.bind();
   }
 
@@ -140,14 +143,18 @@ class UI {
     document.getElementById('app').setAttribute('data-view', view);
     document.querySelectorAll('.nav-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === view));
-    // Le jeu ne tourne QUE sur la vue « jeu » : sur la boutique il est en pause.
-    this.game.paused = (view === 'shop');
+    // Le jeu ne tourne QUE sur la vue « jeu » : sur la boutique ET l'autel il
+    // est en pause (l'autel se consulte hors d'un niveau).
+    this.game.paused = (view === 'shop' || view === 'altar');
     if (view === 'game') {
       // La vue jeu venant d'apparaître, on recalcule la taille du canevas.
       window.dispatchEvent(new Event('resize'));
-    } else {
+    } else if (view === 'shop') {
       // La vue Pouvoirs venant d'apparaître : on centre l'arbre au besoin.
       requestAnimationFrame(() => this.centerTreeIfNeeded());
+    } else if (view === 'altar') {
+      this.buildAltar();
+      this.refreshAltar();
     }
   }
 
@@ -552,6 +559,14 @@ class UI {
     }
     if (affordable > 0) { badge.textContent = affordable; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
+
+    // Carte de l'autel (si déjà construite) + pastille de l'onglet Autel.
+    this.refreshAltar();
+    const abadge = this.$('nav-altar-badge');
+    const unsealed = PRIMORDIAL_DEMONS.filter((dm) => !g.demonUnlocked(dm.id)).length;
+    if (unsealed > 0 && g.souls >= g.offeringCost()) {
+      abadge.textContent = unsealed; abadge.classList.remove('hidden');
+    } else abadge.classList.add('hidden');
   }
 
   /* ---------------------- Sorts actifs (boutons en jeu) ---------------------- */
@@ -593,6 +608,152 @@ class UI {
       b.classList.toggle('used', !!used);
       b.querySelector('.ab-cd').textContent = used ? '✓' : (ready ? '' : Math.ceil(cd));
     }
+  }
+
+  /* ---------------------- Autel des démons primordiaux ---------------------- */
+  buildAltar() {
+    if (this.altarBuilt) return;
+    this.altarBuilt = true;
+    this.demonIndex = 0;
+    const dots = this.$('demon-dots');
+    dots.innerHTML = '';
+    PRIMORDIAL_DEMONS.forEach((d, i) => {
+      const s = document.createElement('span');
+      s.dataset.i = i; s.title = d.sin;
+      s.style.background = d.color;
+      s.addEventListener('click', () => { this.demonIndex = i; this.renderDemon(); });
+      dots.appendChild(s);
+    });
+    this.$('demon-prev').addEventListener('click', () => this.stepDemon(-1));
+    this.$('demon-next').addEventListener('click', () => this.stepDemon(1));
+    // Glissement latéral (swipe) pour changer de démon.
+    const car = this.$('demon-carousel');
+    let sx = 0, down = false;
+    car.addEventListener('pointerdown', (e) => { down = true; sx = e.clientX; });
+    car.addEventListener('pointerup', (e) => {
+      if (!down) return; down = false;
+      const dx = e.clientX - sx;
+      if (Math.abs(dx) > 45) this.stepDemon(dx < 0 ? 1 : -1);
+    });
+    this.renderDemon();
+  }
+
+  stepDemon(dir) {
+    const n = PRIMORDIAL_DEMONS.length;
+    this.demonIndex = (this.demonIndex + dir + n) % n;
+    this.renderDemon();
+  }
+
+  renderDemon() {
+    const d = PRIMORDIAL_DEMONS[this.demonIndex];
+    const stage = this.$('demon-stage');
+    stage.innerHTML = `
+      <div class="demon-card" style="--demon-color:${d.color}">
+        <div class="demon-sin">${d.sin}</div>
+        <div class="demon-art" id="demon-art">${d.emoji}</div>
+        <div class="demon-name">${d.name}</div>
+        <div class="demon-pact">🔥 ${d.pact}</div>
+        <div class="demon-desc">${d.desc}</div>
+        <div class="demon-progress"><span id="demon-bar"></span></div>
+        <div class="demon-progress-lbl" id="demon-prog"></div>
+        <button class="demon-offer" id="demon-offer-btn"></button>
+      </div>`;
+    this.$('demon-offer-btn').addEventListener('click', () => this.offerToDemon(d.id));
+    this.$('demon-dots').querySelectorAll('span').forEach((s, i) =>
+      s.classList.toggle('on', i === this.demonIndex));
+    this.refreshAltar();
+  }
+
+  offerToDemon(id) {
+    if (this.game.offerSouls(id)) {
+      this.altarBurst();   // âmes qui filent vers la bouche du démon
+      this.refresh();
+    }
+  }
+
+  /* Met à jour la carte du démon courant + les pastilles. */
+  refreshAltar() {
+    if (!this.altarBuilt) return;
+    const g = this.game;
+    const d = PRIMORDIAL_DEMONS[this.demonIndex];
+    const count = g.offeringCount(d.id);
+    const sealed = g.demonUnlocked(d.id);
+    const bar = this.$('demon-bar'), prog = this.$('demon-prog'), btn = this.$('demon-offer-btn');
+    if (bar) bar.style.width = Math.round((count / OFFERINGS_PER_DEMON) * 100) + '%';
+    if (prog) prog.textContent = `${count} / ${OFFERINGS_PER_DEMON} offrandes`;
+    if (btn) {
+      if (sealed) {
+        btn.innerHTML = '✓ Pacte scellé';
+        btn.classList.add('sealed'); btn.disabled = true;
+      } else {
+        const cost = g.offeringCost();
+        btn.classList.remove('sealed');
+        btn.innerHTML = `🩸 Offrir une âme<small>💀 ${this.fmt(cost)}</small>`;
+        btn.disabled = g.souls < cost;
+      }
+    }
+    this.$('demon-dots').querySelectorAll('span').forEach((s, i) =>
+      s.classList.toggle('sealed', g.demonUnlocked(PRIMORDIAL_DEMONS[i].id)));
+  }
+
+  /* Animation : particules d'âme convergeant vers la bouche du démon choisi. */
+  altarBurst() {
+    const cv = this.$('altar-fx');
+    if (!cv) return;
+    const wrap = cv.getBoundingClientRect();
+    if (wrap.width < 4) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(wrap.width * dpr);
+    cv.height = Math.round(wrap.height * dpr);
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Point « bouche » : centre-bas de l'emoji du démon.
+    let mx = wrap.width / 2, my = wrap.height * 0.42;
+    const art = this.$('demon-art');
+    if (art) {
+      const a = art.getBoundingClientRect();
+      mx = a.left - wrap.left + a.width / 2;
+      my = a.top - wrap.top + a.height * 0.62;
+      art.classList.remove('gulp'); void art.offsetWidth; art.classList.add('gulp');
+    }
+    const parts = [];
+    const N = 26;
+    const spread = Math.max(wrap.width, wrap.height);
+    for (let i = 0; i < N; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = 120 + Math.random() * spread * 0.42;
+      parts.push({
+        sx: mx + Math.cos(ang) * rad, sy: my + Math.sin(ang) * rad + 30,
+        delay: Math.random() * 0.28, dur: 0.55 + Math.random() * 0.4,
+        wob: (Math.random() * 2 - 1) * 34, size: 3 + Math.random() * 3,
+        color: Math.random() < 0.5 ? '#d9b3ff' : '#ffffff',
+      });
+    }
+    const start = performance.now();
+    const loop = (now) => {
+      const el = (now - start) / 1000;
+      ctx.clearRect(0, 0, wrap.width, wrap.height);
+      let alive = 0;
+      for (const p of parts) {
+        const lt = (el - p.delay) / p.dur;
+        if (lt < 0) { alive++; continue; }
+        if (lt >= 1) continue;
+        alive++;
+        const e = lt * lt * (3 - 2 * lt); // smoothstep
+        const x = p.sx + (mx - p.sx) * e + Math.sin(lt * Math.PI) * p.wob;
+        const y = p.sy + (my - p.sy) * e;
+        ctx.globalAlpha = lt < 0.85 ? 1 : Math.max(0, (1 - lt) / 0.15);
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = '#c9a0ff'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(x, y, p.size * (1.25 - 0.5 * e), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+      if (alive > 0) requestAnimationFrame(loop);
+      else ctx.clearRect(0, 0, wrap.width, wrap.height);
+    };
+    requestAnimationFrame(loop);
   }
 
   /* ---------------------- Vue de fin de niveau (côté Chaos) ---------------------- */
