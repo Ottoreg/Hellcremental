@@ -471,7 +471,7 @@ const SKILL_TREE = [
  * ------------------------------------------------------------------------- */
 const OFFERINGS_PER_DEMON = 10;   // offrandes nécessaires pour sceller un pacte
 const OFFERING_BASE = 1500;       // coût de la toute première offrande
-const OFFERING_GROWTH = 1.27;     // facteur d'escalade par offrande globale
+const OFFERING_GROWTH = 1.14;     // facteur d'escalade par offrande globale
 
 const PRIMORDIAL_DEMONS = [
   {

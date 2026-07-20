@@ -324,7 +324,9 @@ class UI {
     const hideHint = () => this.$('tree-hint').classList.add('gone');
 
     el.addEventListener('pointerdown', (e) => {
-      if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (x) {} }
+      // NB : on ne capture PAS le pointeur ici — sinon l'event « click » est
+      // redirigé vers #skilltree et n'atteint jamais le bouton du pacte (la
+      // fiche ne s'ouvrait pas sur PC). On capture seulement au vrai glissement.
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       this._treeDragged = false;
       if (pointers.size === 1) {
@@ -357,7 +359,11 @@ class UI {
         this.applyTreeTransform();
       } else if (pan) {
         const dx = e.clientX - pan.sx, dy = e.clientY - pan.sy;
-        if (!this._treeDragged && Math.hypot(dx, dy) > 6) { this._treeDragged = true; hideHint(); }
+        if (!this._treeDragged && Math.hypot(dx, dy) > 6) {
+          this._treeDragged = true; hideHint();
+          // Le glissement commence : on capture le pointeur pour un pan fluide.
+          if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (x) {} }
+        }
         if (this._treeDragged) {
           this.treeOffset.x = pan.ox + dx;
           this.treeOffset.y = pan.oy + dy;
