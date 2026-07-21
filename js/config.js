@@ -80,11 +80,14 @@ function isBossLevel(level) { return level % 10 === 0; }
  * incarner un démon primordial pour affronter les Archanges méga-boss).
  * ------------------------------------------------------------------------- */
 const VIRTUES = [
-  { id: 'humilite',      name: 'Humilité',      sin: 'orgueil',     emoji: '🕊️', hp: 240, value: 200 },
+  // NB : emojis à un seul codepoint (pas de sélecteur VS16) pour un rendu
+  // centré fiable sur tous les navigateurs (les séquences VS16 comme 🕊️/⚖️
+  // se décalaient hors de l'aura sur certains PC).
+  { id: 'humilite',      name: 'Humilité',      sin: 'orgueil',     emoji: '🙏', hp: 240, value: 200 },
   { id: 'charite',       name: 'Charité',       sin: 'avarice',     emoji: '🤲', hp: 260, value: 230 },
   { id: 'chastete',      name: 'Chasteté',      sin: 'luxure',      emoji: '💠', hp: 280, value: 260 },
   { id: 'bienveillance', name: 'Bienveillance', sin: 'envie',       emoji: '🤝', hp: 300, value: 290 },
-  { id: 'temperance',    name: 'Tempérance',    sin: 'gourmandise', emoji: '⚖️', hp: 320, value: 320 },
+  { id: 'temperance',    name: 'Tempérance',    sin: 'gourmandise', emoji: '🍃', hp: 320, value: 320 },
   { id: 'patience',      name: 'Patience',      sin: 'colere',      emoji: '🧘', hp: 340, value: 350 },
   { id: 'diligence',     name: 'Diligence',     sin: 'paresse',     emoji: '🐝', hp: 360, value: 380 },
 ];
