@@ -241,6 +241,14 @@ class Game {
     return node ? node.parent : null;
   }
 
+  /* Prérequis directs d'un pacte : soit reqAll (plusieurs), soit le parent. */
+  prereqIds(id) {
+    const node = SKILL_TREE.find(n => n.id === id);
+    if (!node) return [];
+    if (node.reqAll) return node.reqAll.slice();
+    return (node.parent && node.parent !== 'root') ? [node.parent] : [];
+  }
+
   /* Un pacte est débloqué si sa branche part du démon, si son parent a atteint
    * le niveau requis, ET si aucune voie rivale exclusive n'a déjà été choisie. */
   isUnlocked(id) {
@@ -255,6 +263,8 @@ class Game {
     }
     // Certains pactes exigent une voie précise (ex. buffs de serviteurs -> Légions).
     if (node.reqVoie && this.upgradeLevel(node.reqVoie) < 1) return false;
+    // Prérequis multiples : TOUS les pactes de reqAll doivent être achetés.
+    if (node.reqAll) return node.reqAll.every(pid => this.upgradeLevel(pid) >= 1);
     const parent = node.parent;
     if (!parent || parent === 'root') return true;
     return this.upgradeLevel(parent) >= (node.req || 1);
