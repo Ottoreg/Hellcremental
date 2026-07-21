@@ -588,3 +588,57 @@ const PRIMORDIAL_DEMONS = [
     apply: (s) => { s.slothSlow = Math.max(s.slothSlow, 0.35); },
   },
 ];
+
+/* -------------------------------------------------------------------------
+ * Prestige — « Boutique Démoniaque ».
+ * Une fois les 7 Vertus vaincues, le joueur peut PRESTIGER : la progression
+ * (âmes, niveau, pactes, offrandes, vertus) repart à zéro et il gagne 1 point
+ * de prestige. Ces points achètent 7 améliorations PERMANENTES du personnage,
+ * conservées à travers tous les prestiges.
+ * ------------------------------------------------------------------------- */
+const PRESTIGE_COST = 1; // coût (en points) d'un niveau d'amélioration permanente
+
+const PRESTIGE_UPGRADES = [
+  {
+    id: 'p_dmg', name: 'Puissance Éternelle', emoji: '🩸',
+    desc: 'Augmente définitivement les dégâts de base du démon.',
+    effect: (n) => `+${25 * n}% de dégâts de base`,
+    apply: (s, n) => { s.damage *= (1 + 0.25 * n); },
+  },
+  {
+    id: 'p_speed', name: 'Célérité Éternelle', emoji: '🦶',
+    desc: 'Le démon se déplace définitivement plus vite.',
+    effect: (n) => `+${15 * n}% de vitesse`,
+    apply: (s, n) => { s.moveSpeed *= (1 + 0.15 * n); },
+  },
+  {
+    id: 'p_attack', name: 'Frénésie Éternelle', emoji: '⚡',
+    desc: 'Réduit définitivement le délai entre deux attaques.',
+    effect: (n) => `−${Math.round((1 - Math.pow(0.9, n)) * 100)}% de délai d'attaque`,
+    apply: (s, n) => { s.attackInterval *= Math.pow(0.9, n); },
+  },
+  {
+    id: 'p_splash', name: 'Brasier Éternel', emoji: '🔥',
+    desc: 'Augmente définitivement les dégâts de zone (propagation).',
+    effect: (n) => `+${30 * n}% de dégâts de zone`,
+    apply: (s, n) => { s.splash += 0.3 * n; },
+  },
+  {
+    id: 'p_click', name: 'Griffe Éternelle', emoji: '👊',
+    desc: 'Augmente définitivement les dégâts du clic infernal.',
+    effect: (n) => `+${30 * n}% de dégâts de clic`,
+    apply: (s, n) => { s.clickDamage *= (1 + 0.3 * n); },
+  },
+  {
+    id: 'p_power', name: 'Arcane Éternelle', emoji: '🌠',
+    desc: 'Augmente définitivement les dégâts des pouvoirs actifs (Foudre, Météore, Flammes Noires…).',
+    effect: (n) => `+${25 * n}% de dégâts des pouvoirs`,
+    apply: (s, n) => { s.powerDmg += 0.25 * n; },
+  },
+  {
+    id: 'p_servant', name: 'Légion Éternelle', emoji: '🧟',
+    desc: 'Augmente définitivement les dégâts de tous tes serviteurs.',
+    effect: (n) => `+${25 * n}% de dégâts des serviteurs`,
+    apply: (s, n) => { s.servantDmg += 0.25 * n; },
+  },
+];

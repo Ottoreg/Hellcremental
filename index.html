@@ -57,6 +57,7 @@
           <div><b id="total-destroyed">0</b><small>ravages</small></div>
         </div>
         <button id="install-btn" class="icon-btn hidden" title="Installer l'application">📲</button>
+        <button id="prestige-btn" class="icon-btn hidden" title="Boutique Démoniaque (Prestige)">🔻</button>
         <button id="cheat-btn" class="icon-btn" title="+1 milliard d'âmes (test)">💰</button>
         <button id="menu-btn" class="icon-btn" title="Options">⚙️</button>
       </div>
@@ -217,6 +218,21 @@
           <h3>⚠️ Zone de damnation</h3>
           <button id="reset-btn" class="reset-btn">↺ Recommencer à zéro</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Boutique Démoniaque (Prestige) : améliorations permanentes -->
+    <div id="prestige-modal" class="hidden">
+      <div class="prestige-card">
+        <button id="prestige-close" class="menu-close" title="Fermer">✕</button>
+        <h2>🔻 Boutique Démoniaque</h2>
+        <p class="prestige-sub">Le prestige remet ta progression à zéro et t'octroie
+           <b>1 point</b>. Dépense tes points en améliorations <b>permanentes</b>,
+           conservées à jamais.</p>
+        <p class="prestige-points-line">Points de Prestige : <b id="prestige-points">0</b>
+           <span id="prestige-count"></span></p>
+        <div id="prestige-rebirth"></div>
+        <div id="prestige-grid" class="prestige-grid"></div>
       </div>
     </div>
 

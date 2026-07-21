@@ -19,6 +19,9 @@ class Game {
     this.upgrades = {};        // id -> niveau acheté
     this.offerings = {};       // démon primordial -> nombre d'offrandes faites
     this.virtuesDefeated = {}; // vertu (boss de dizaine) -> vaincue
+    this.prestigePoints = 0;   // points de prestige à dépenser
+    this.prestigeUpgrades = {};// améliorations permanentes achetées (id -> niveau)
+    this.prestigeCount = 0;    // nombre de prestiges effectués
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
@@ -73,6 +76,9 @@ class Game {
       upgrades: this.upgrades,
       offerings: this.offerings,
       virtuesDefeated: this.virtuesDefeated,
+      prestigePoints: this.prestigePoints,
+      prestigeUpgrades: this.prestigeUpgrades,
+      prestigeCount: this.prestigeCount,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -126,6 +132,9 @@ class Game {
     this.upgrades = d.upgrades || {};
     this.offerings = d.offerings || {};
     this.virtuesDefeated = d.virtuesDefeated || {};
+    this.prestigePoints = d.prestigePoints || 0;
+    this.prestigeUpgrades = d.prestigeUpgrades || {};
+    this.prestigeCount = d.prestigeCount || 0;
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
@@ -147,6 +156,7 @@ class Game {
     this.seed = makeSeed();
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
+    this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -232,8 +242,46 @@ class Game {
   /* ---------------------- Vertus & Prestige ---------------------- */
   virtuesDefeatedCount() { return VIRTUES.filter(v => this.virtuesDefeated[v.id]).length; }
   allVirtuesDefeated() { return VIRTUES.every(v => this.virtuesDefeated[v.id]); }
-  /* Le Prestige s'éveille une fois les 7 Vertus vaincues (mécanique à venir). */
+  /* Le Prestige est disponible une fois les 7 Vertus vaincues. */
   prestigeUnlocked() { return this.allVirtuesDefeated(); }
+  canPrestige() { return this.prestigeUnlocked(); }
+
+  /* Prestige : remet la progression à zéro et octroie 1 point de prestige.
+   * Conserve les points/améliorations de prestige et les records. */
+  doPrestige() {
+    if (!this.canPrestige()) return false;
+    this.prestigePoints += 1;
+    this.prestigeCount += 1;
+    // Remise à zéro de la progression.
+    this.souls = 0;
+    this.level = 1;
+    this.upgrades = {};
+    this.offerings = {};
+    this.virtuesDefeated = {};
+    this.pendingRun = null;
+    this.phase = 'idle';
+    this.computeStats(true);
+    this.save();
+    this.onChange();
+    return true;
+  }
+
+  /* --- Boutique Démoniaque : améliorations permanentes achetées en points --- */
+  prestigeUpgradeLevel(id) { return this.prestigeUpgrades[id] || 0; }
+  prestigeCost() { return PRESTIGE_COST; }
+  buyPrestigeUpgrade(id) {
+    const def = PRESTIGE_UPGRADES.find(u => u.id === id);
+    if (!def) return false;
+    const cost = this.prestigeCost();
+    if (this.prestigePoints < cost) return false;
+    if (def.max && this.prestigeUpgradeLevel(id) >= def.max) return false;
+    this.prestigePoints -= cost;
+    this.prestigeUpgrades[id] = this.prestigeUpgradeLevel(id) + 1;
+    this.computeStats(this.phase === 'playing' ? false : true);
+    this.save();
+    this.onChange();
+    return true;
+  }
 
   /* Parent d'un pacte dans l'arbre (null pour les branches issues du démon). */
   parentOf(id) {
@@ -304,6 +352,7 @@ class Game {
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
       foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
+      powerDmg: 0, servantDmg: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -312,6 +361,11 @@ class Game {
     // Pactes capitaux des démons primordiaux (offrandes complètes).
     for (const dmn of PRIMORDIAL_DEMONS) {
       if (this.demonUnlocked(dmn.id)) dmn.apply(s);
+    }
+    // Améliorations permanentes de prestige (conservées à travers les prestiges).
+    for (const pu of PRESTIGE_UPGRADES) {
+      const pn = this.prestigeUpgradeLevel(pu.id);
+      if (pn > 0) pu.apply(s, pn);
     }
     // Malus du Serment du Chaos Absolu : ta puissance démoniaque attire les
     // exorcistes → le temps avant exorcisme est divisé par 2 (appliqué sur le
@@ -485,7 +539,7 @@ class Game {
     if (!alive.length) return;
     // Centre sur une case occupée au hasard (pour toucher quelque chose).
     const c = alive[Math.floor(Math.random() * alive.length)];
-    const dmg = Math.round(s.damage * (8 + n * 2));
+    const dmg = Math.round(s.damage * (8 + n * 2) * (1 + s.powerDmg));
     const rad = 1 + s.meteoreZone; // Cœur du Météore agrandit la zone
     this.spawnMeteor(c.gx, c.gy, rad);
     for (const t of this.targets) {
@@ -569,7 +623,7 @@ class Game {
     const s = this.stats;
     const n = Math.max(1, s.foudre);
     const strikes = 2 + n;
-    const dmg = Math.round(s.damage * (4 + n * 1.5) * (1 + s.foudreDmg));
+    const dmg = Math.round(s.damage * (4 + n * 1.5) * (1 + s.foudreDmg) * (1 + s.powerDmg));
     const alive = this.targets.filter(t => !t.dead);
     for (let i = 0; i < strikes && alive.length; i++) {
       const idx = Math.floor(Math.random() * alive.length);
@@ -736,7 +790,7 @@ class Game {
 
     // Flammes Noires : feu persistant qui brûle et se propage sur la grille.
     if (this.blackfires.length) {
-      const bfDps = this.stats.damage * 1.5 * (1 + this.stats.blackfire * 0.4);
+      const bfDps = this.stats.damage * 1.5 * (1 + this.stats.blackfire * 0.4) * (1 + this.stats.powerDmg);
       for (const bf of this.blackfires) {
         for (const t of this.targets) {
           if (t.dead) continue;
@@ -832,7 +886,7 @@ class Game {
 
   /* Onde de choc du Colosse (premier coup sur un bâtiment). */
   demolisherShockwave(t, s) {
-    const dmg = s.damage * 3 * (1 + s.minionDmgBonus + s.demoDmgBonus);
+    const dmg = s.damage * 3 * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg);
     this.impacts.push({ gx: t.gx, gy: t.gy, life: 0.4, max: 0.4, rad: 1 });
     for (const o of this.targets) {
       if (o.dead || o === t) continue;
@@ -851,7 +905,7 @@ class Game {
     if (storms.length < 2) return;
     const A = storms[0], B = storms[1];
     this.arc = { ax: A.gx, ay: A.gy, bx: B.gx, by: B.gy };
-    const dps = s.damage * 2 * (1 + s.stormlingDmg);
+    const dps = s.damage * 2 * (1 + s.stormlingDmg) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (this.distToSegment(t.gx, t.gy, A.gx, A.gy, B.gx, B.gy) <= 0.6) {
@@ -885,7 +939,7 @@ class Game {
     }
     // Nuage de peste : dégâts continus autour du vagabond (plus large avec le trait).
     const radius = s.vagabondTrait ? 2.0 : 1.3;
-    const dps = s.damage * 2.0 * (1 + s.vagabondDmg);
+    const dps = s.damage * 2.0 * (1 + s.vagabondDmg) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (Math.hypot(t.gx - a.gx, t.gy - a.gy) <= radius) {
@@ -917,7 +971,7 @@ class Game {
     const alive = this.targets.filter(t => !t.dead);
     if (!alive.length) return;
     a.lunge = 1;
-    const dmg = s.damage * 7.5 * (1 + s.stormlingDmg);
+    const dmg = s.damage * 7.5 * (1 + s.stormlingDmg) * (1 + s.servantDmg);
     const bolts = 1 + s.foudroyeurTrait;
     for (let i = 0; i < bolts; i++) {
       const t = alive[Math.floor(Math.random() * alive.length)];
@@ -957,9 +1011,9 @@ class Game {
     if (a.isDemolisher) {
       let dmg = s.damage * 2;                 // colosse : frappe lourde
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
-      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus);
+      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg);
     }
-    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus)); // serviteur
+    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg)); // serviteur
   }
 
   hitTarget(t, dmg, source) {
