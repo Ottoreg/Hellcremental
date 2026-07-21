@@ -320,13 +320,31 @@ class UI {
       const maxed = n >= def.max;
       const cost = g.upgradeCost(def);
       const unlocked = g.isUnlocked(def.id);
-      el.querySelector('[data-lvl]').textContent = maxed ? 'MAX' : `Niv. ${n}`;
-      el.querySelector('[data-cost]').textContent =
-        !unlocked ? '🔒 Verrouillé' : maxed ? '✓ MAX' : `💀 ${this.fmt(cost)}`;
-      const affordable = unlocked && !maxed && g.souls >= cost;
-      el.classList.toggle('affordable', affordable);
-      el.classList.toggle('maxed', maxed && unlocked);
-      el.classList.toggle('locked', !unlocked);
+      // Masqué : le pacte précédent (parent) n'est pas encore acheté → « ? ».
+      const masked = this.isMasked(def.id);
+      el.classList.toggle('masked', masked);
+      const emojiEl = el.querySelector('.tn-emoji');
+      const nameEl = el.querySelector('.tn-name');
+      if (masked) {
+        emojiEl.textContent = '❓';
+        nameEl.textContent = '???';
+        el.title = 'Pacte inconnu — débloque le précédent';
+        el.querySelector('[data-lvl]').textContent = '';
+        el.querySelector('[data-cost]').textContent = '🔒';
+        el.classList.remove('affordable', 'maxed');
+        el.classList.add('locked');
+      } else {
+        emojiEl.textContent = def.emoji;
+        nameEl.textContent = def.name;
+        el.title = def.name;
+        el.querySelector('[data-lvl]').textContent = maxed ? 'MAX' : `Niv. ${n}`;
+        el.querySelector('[data-cost]').textContent =
+          !unlocked ? '🔒 Verrouillé' : maxed ? '✓ MAX' : `💀 ${this.fmt(cost)}`;
+        const affordable = unlocked && !maxed && g.souls >= cost;
+        el.classList.toggle('affordable', affordable);
+        el.classList.toggle('maxed', maxed && unlocked);
+        el.classList.toggle('locked', !unlocked);
+      }
       const line = this.$('tree-links').querySelector(`line[data-id="${def.id}"]`);
       if (line) line.classList.toggle('lit', n > 0);
     }
@@ -498,7 +516,17 @@ class UI {
     });
   }
 
+  /* Un pacte est « masqué » (affiché « ? ») tant que son prédécesseur direct
+   * (parent dans l'arbre) n'a pas été acheté. */
+  isMasked(id) {
+    const node = SKILL_TREE.find((n) => n.id === id);
+    if (!node || !node.parent || node.parent === 'root') return false;
+    // Masqué tant que le prédécesseur n'a pas été acheté (niveau 0).
+    return this.game.upgradeLevel(node.parent) < 1;
+  }
+
   openNode(id) {
+    if (this.isMasked(id)) return; // pacte masqué : rien à révéler
     this._nodeId = id;
     this.renderNode();
     this.$('node-modal').classList.remove('hidden');
