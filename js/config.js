@@ -493,18 +493,18 @@ const SKILL_TREE = [
   { id: 'minion_speed', x: 1110, y: 620, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
   { id: 'demo_dmg',     x: 1150, y: 730, parent: 'demolisseur', req: 1, reqVoie: 'voie_legion' },
   { id: 'demo_speed',   x: 1200, y: 835, parent: 'demolisseur', req: 1, reqVoie: 'voie_legion' },
-  // Trait du Colosse (disponible sans la voie).
-  { id: 'demo_trait',   x: 1290, y: 760, parent: 'demolisseur', req: 1 },
+  // Trait du Colosse (réservé à la Voie des Légions).
+  { id: 'demo_trait',   x: 1290, y: 760, parent: 'demolisseur', req: 1, reqVoie: 'voie_legion' },
   // Vagabonds (après le Colosse).
   { id: 'vagabond',       x: 930, y: 930,  parent: 'demolisseur', req: 1 },
   { id: 'vagabond_dmg',   x: 770, y: 960,  parent: 'vagabond', req: 1, reqVoie: 'voie_legion' },
   { id: 'vagabond_speed', x: 700, y: 1050, parent: 'vagabond', req: 1, reqVoie: 'voie_legion' },
-  { id: 'vagabond_trait', x: 1090, y: 985, parent: 'vagabond', req: 1 },
+  { id: 'vagabond_trait', x: 1090, y: 985, parent: 'vagabond', req: 1, reqVoie: 'voie_legion' },
   // Foudroyeur (après les vagabonds) et ses améliorations.
   { id: 'foudroyeur',       x: 930,  y: 1080, parent: 'vagabond', req: 1 },
   { id: 'foudroyeur_dmg',   x: 770,  y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
   { id: 'foudroyeur_rate',  x: 1090, y: 1170, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
-  { id: 'foudroyeur_trait', x: 930,  y: 1245, parent: 'foudroyeur', req: 1 },
+  { id: 'foudroyeur_trait', x: 930,  y: 1245, parent: 'foudroyeur', req: 1, reqVoie: 'voie_legion' },
   // Trait des Esprits Serviteurs : traque des prêtres (réservé à la Voie des Légions).
   // Placé en haut à droite du pacte des Esprits Serviteurs.
   { id: 'chasse_pretres', x: 1010, y: 415, parent: 'minions', req: 1, reqVoie: 'voie_legion' },
