@@ -250,7 +250,7 @@ class Game {
    * Conserve les points/améliorations de prestige et les records. */
   doPrestige() {
     if (!this.canPrestige()) return false;
-    this.prestigePoints += 1;
+    this.prestigePoints += PRESTIGE_REWARD;
     this.prestigeCount += 1;
     // Remise à zéro de la progression.
     this.souls = 0;

@@ -244,7 +244,7 @@ class UI {
     // Section « Renaître » : disponible une fois les 7 Vertus vaincues.
     const rb = this.$('prestige-rebirth');
     if (g.prestigeUnlocked()) {
-      rb.innerHTML = `<button id="do-prestige" class="big-btn">🔻 Renaître — remet la progression à 0 · +1 point</button>`;
+      rb.innerHTML = `<button id="do-prestige" class="big-btn">🔻 Renaître — remet la progression à 0 · +${PRESTIGE_REWARD} points</button>`;
       rb.querySelector('#do-prestige').addEventListener('click', () => this.confirmPrestige());
     } else {
       const c = g.virtuesDefeatedCount();
@@ -278,7 +278,7 @@ class UI {
     const g = this.game;
     if (!g.canPrestige()) return;
     const ok = confirm('Renaître ?\n\nTa progression (âmes, niveau, pactes, offrandes, Vertus) ' +
-      'repart à ZÉRO. Tu gagnes 1 point de prestige et conserves toutes tes ' +
+      'repart à ZÉRO. Tu gagnes ' + PRESTIGE_REWARD + ' points de prestige et conserves toutes tes ' +
       'améliorations permanentes.');
     if (!ok) return;
     g.doPrestige();

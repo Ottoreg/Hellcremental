@@ -596,7 +596,8 @@ const PRIMORDIAL_DEMONS = [
  * de prestige. Ces points achètent 7 améliorations PERMANENTES du personnage,
  * conservées à travers tous les prestiges.
  * ------------------------------------------------------------------------- */
-const PRESTIGE_COST = 1; // coût (en points) d'un niveau d'amélioration permanente
+const PRESTIGE_COST = 1;   // coût (en points) d'un niveau d'amélioration permanente
+const PRESTIGE_REWARD = 3; // points gagnés à chaque prestige
 
 const PRESTIGE_UPGRADES = [
   {
