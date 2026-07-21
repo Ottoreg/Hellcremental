@@ -448,10 +448,11 @@ const UPGRADES = [
     id: 'finisher', name: 'Damnation Finale', emoji: '👹', active: true,
     desc: 'Sort ACTIF (une seule fois par niveau) : bannis TOUS tes serviteurs ' +
           'pour le reste du niveau et, en échange, ta griffe entre en furie ' +
-          'pendant 10 s — dégâts de clic décuplés et frappe en zone. Un vrai ' +
-          'finisher pour tout raser toi-même.',
+          'pendant 10 s — dégâts de clic décuplés et frappe en zone. Les ' +
+          'entités vivantes tuées pendant la furie meurent DÉFINITIVEMENT ' +
+          '(elles ne réapparaissent plus). Un vrai finisher pour tout raser.',
     baseCost: 40000, mult: 1.7, max: 8,
-    effect: (n) => `Furie 10 s · clic ×${6 + n * 2} · zone ${1 + Math.min(2, Math.floor(n / 2))} case(s) · 1×/niveau`,
+    effect: (n) => `Furie 10 s · clic ×${6 + n * 2} · zone ${1 + Math.min(2, Math.floor(n / 2))} case(s) · morts définitives · 1×/niveau`,
     apply: (s, n) => { s.finisher = n; },
   },
 ];

@@ -979,8 +979,9 @@ class Game {
     if (t.dead) return;
     t.dead = true; t.deathT = 0.5;
     // Réapparition (niveaux 31+) : une entité vivante ordinaire (ni boss ni
-    // prêtre) reviendra à la vie si on ne finit pas le niveau à temps.
-    t.respawnT = (this.respawnActive && t.def.living && !t.boss && !t.priest)
+    // prêtre) reviendra à la vie si on ne finit pas le niveau à temps — SAUF
+    // celles tuées pendant la Damnation Finale, qui meurent définitivement.
+    t.respawnT = (this.respawnActive && t.def.living && !t.boss && !t.priest && this.clickBuff <= 0)
       ? this.respawnDelay() : 0;
     // Une Vertu (boss de dizaine) abattue : on la marque comme vaincue.
     if (t.def && t.def.virtue && !this.virtuesDefeated[t.def.virtue]) {
