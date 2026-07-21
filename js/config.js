@@ -39,7 +39,7 @@ const TARGET_TYPES = {
   puits:      { name: 'Puits',        emoji: '⛲', hp: 55,  value: 14, living: false },
   eglise:     { name: 'Chapelle',     emoji: '⛪', hp: 120, value: 40, living: false },
   statue:     { name: 'Statue sainte',emoji: '🗿', hp: 160, value: 55, living: false },
-  chevalier:  { name: 'Paladin',      emoji: '🛡️', hp: 90,  value: 45, living: true  },
+  chevalier:  { name: 'Paladin',      emoji: '💂', hp: 90,  value: 45, living: true  },
 
   // --- Cibles urbaines (biomes Ville → Métropole) ---
   citadin:    { name: 'Citadin',      emoji: '🚶', hp: 16,  value: 15, living: true  },
