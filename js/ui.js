@@ -59,6 +59,13 @@ class UI {
       this.refresh();
     });
 
+    // --- Boutique Démoniaque (Prestige) ---
+    this.$('prestige-btn').addEventListener('click', () => this.openPrestige());
+    this.$('prestige-close').addEventListener('click', () => this.closePrestige());
+    this.$('prestige-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'prestige-modal') this.closePrestige();
+    });
+
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
@@ -144,15 +151,21 @@ class UI {
     if (!el) return;
     const g = this.game;
     const done = g.virtuesDefeatedCount();
-    if (done === 0) { el.classList.add('hidden'); return; }
+    if (done === 0 && g.prestigeCount === 0) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
     const pips = VIRTUES.map((v) =>
       `<span class="vt-pip ${g.virtuesDefeated[v.id] ? 'on' : ''}" title="${v.name}">${g.virtuesDefeated[v.id] ? v.emoji : '·'}</span>`
     ).join('');
-    const prestige = g.prestigeUnlocked()
-      ? `<div class="vt-prestige">✨ Prestige éveillé <small>(à venir)</small></div>` : '';
+    let prestige = '';
+    if (g.prestigeUnlocked()) {
+      prestige = `<button id="vt-prestige-btn" class="vt-prestige-btn">🔻 Prestige disponible — ouvrir la Boutique</button>`;
+    } else if (g.prestigeCount > 0) {
+      prestige = `<div class="vt-prestige">🔻 ${g.prestigeCount} prestige${g.prestigeCount > 1 ? 's' : ''} · ${g.prestigePoints} point${g.prestigePoints > 1 ? 's' : ''}</div>`;
+    }
     el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
       `<div class="vt-pips">${pips}</div>${prestige}`;
+    const b = el.querySelector('#vt-prestige-btn');
+    if (b) b.addEventListener('click', () => this.openPrestige());
   }
 
   /* Bascule entre la vue jeu et la vue boutique (mobile). */
@@ -217,6 +230,63 @@ class UI {
     this.$('menu').classList.remove('hidden');
   }
   closeMenu() { this.$('menu').classList.add('hidden'); }
+
+  /* ---------------------- Boutique Démoniaque (Prestige) ---------------------- */
+  openPrestige() { this.renderPrestige(); this.$('prestige-modal').classList.remove('hidden'); }
+  closePrestige() { this.$('prestige-modal').classList.add('hidden'); }
+
+  renderPrestige() {
+    const g = this.game;
+    this.$('prestige-points').textContent = g.prestigePoints;
+    this.$('prestige-count').textContent = g.prestigeCount > 0
+      ? ` · ${g.prestigeCount} prestige${g.prestigeCount > 1 ? 's' : ''}` : '';
+
+    // Section « Renaître » : disponible une fois les 7 Vertus vaincues.
+    const rb = this.$('prestige-rebirth');
+    if (g.prestigeUnlocked()) {
+      rb.innerHTML = `<button id="do-prestige" class="big-btn">🔻 Renaître — remet la progression à 0 · +1 point</button>`;
+      rb.querySelector('#do-prestige').addEventListener('click', () => this.confirmPrestige());
+    } else {
+      const c = g.virtuesDefeatedCount();
+      rb.innerHTML = `<p class="prestige-locked">🔒 Vaincs les 7 Vertus (<b>${c}/${VIRTUES.length}</b>) pour pouvoir renaître.</p>`;
+    }
+
+    // Les 7 améliorations permanentes.
+    const grid = this.$('prestige-grid');
+    grid.innerHTML = '';
+    for (const def of PRESTIGE_UPGRADES) {
+      const n = g.prestigeUpgradeLevel(def.id);
+      const cost = g.prestigeCost();
+      const isMax = def.max && n >= def.max;
+      const afford = !isMax && g.prestigePoints >= cost;
+      const card = document.createElement('div');
+      card.className = 'prestige-item' + (afford ? ' afford' : '');
+      card.innerHTML = `
+        <div class="pi-emoji">${def.emoji}</div>
+        <div class="pi-name">${def.name}</div>
+        <div class="pi-lvl">Niv. ${n}</div>
+        <div class="pi-eff">${def.effect(n || 1)}</div>
+        <button class="pi-buy" ${afford ? '' : 'disabled'}>${isMax ? '✓ MAX' : `Acheter · ${cost} pt`}</button>`;
+      card.querySelector('.pi-buy').addEventListener('click', () => {
+        if (g.buyPrestigeUpgrade(def.id)) { this.renderPrestige(); this.refresh(); }
+      });
+      grid.appendChild(card);
+    }
+  }
+
+  confirmPrestige() {
+    const g = this.game;
+    if (!g.canPrestige()) return;
+    const ok = confirm('Renaître ?\n\nTa progression (âmes, niveau, pactes, offrandes, Vertus) ' +
+      'repart à ZÉRO. Tu gagnes 1 point de prestige et conserves toutes tes ' +
+      'améliorations permanentes.');
+    if (!ok) return;
+    g.doPrestige();
+    this.renderPrestige();
+    this.refresh();
+    this.showStartScreen();                 // progression remise à zéro → accueil
+    this.$('prestige-modal').classList.remove('hidden'); // on garde la boutique ouverte
+  }
 
   async copyExport() {
     const ta = this.$('export-code');
@@ -627,6 +697,13 @@ class UI {
     }
     if (affordable > 0) { badge.textContent = affordable; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
+
+    // Bouton Prestige (topbar) : visible dès que le prestige est disponible
+    // ou déjà entamé. La boutique se met à jour si elle est ouverte.
+    const pbtn = this.$('prestige-btn');
+    pbtn.classList.toggle('hidden', !(g.prestigeUnlocked() || g.prestigeCount > 0));
+    pbtn.classList.toggle('ready', g.prestigeUnlocked());
+    if (!this.$('prestige-modal').classList.contains('hidden')) this.renderPrestige();
 
     // Carte de l'autel (si déjà construite) + pastille de l'onglet Autel.
     this.refreshAltar();
