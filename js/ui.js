@@ -271,15 +271,18 @@ class UI {
     const byId = {};
     SKILL_TREE.forEach((n) => { byId[n.id] = n; });
 
-    // Traits reliant chaque pacte à son parent.
+    // Traits reliant chaque pacte à son/ses prérequis (parent, ou reqAll multiple).
     for (const node of SKILL_TREE) {
-      if (!node.parent) continue;
-      const p = byId[node.parent];
-      const line = document.createElementNS(NS, 'line');
-      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
-      line.setAttribute('x2', node.x); line.setAttribute('y2', node.y);
-      line.dataset.id = node.id;
-      svg.appendChild(line);
+      const prereqs = node.reqAll ? node.reqAll : (node.parent ? [node.parent] : []);
+      for (const pid of prereqs) {
+        const p = byId[pid];
+        if (!p) continue;
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+        line.setAttribute('x2', node.x); line.setAttribute('y2', node.y);
+        line.dataset.id = node.id;
+        svg.appendChild(line);
+      }
     }
 
     // Nœuds.
@@ -345,8 +348,8 @@ class UI {
         el.classList.toggle('maxed', maxed && unlocked);
         el.classList.toggle('locked', !unlocked);
       }
-      const line = this.$('tree-links').querySelector(`line[data-id="${def.id}"]`);
-      if (line) line.classList.toggle('lit', n > 0);
+      this.$('tree-links').querySelectorAll(`line[data-id="${def.id}"]`)
+        .forEach((line) => line.classList.toggle('lit', n > 0));
     }
     this.centerTreeIfNeeded();
   }
@@ -520,9 +523,11 @@ class UI {
    * (parent dans l'arbre) n'a pas été acheté. */
   isMasked(id) {
     const node = SKILL_TREE.find((n) => n.id === id);
-    if (!node || !node.parent || node.parent === 'root') return false;
-    // Masqué tant que le prédécesseur n'a pas été acheté (niveau 0).
-    return this.game.upgradeLevel(node.parent) < 1;
+    if (!node) return false;
+    // Masqué tant qu'un prérequis n'a pas été acheté (niveau 0).
+    const prereqs = this.game.prereqIds(id);
+    if (!prereqs.length) return false;
+    return prereqs.some((pid) => this.game.upgradeLevel(pid) < 1);
   }
 
   openNode(id) {
@@ -550,12 +555,15 @@ class UI {
     const eff = this.$('node-effect');
     const buy = this.$('node-buy');
     if (!unlocked) {
-      // Nom du pacte parent à invoquer d'abord.
-      const parentDef = UPGRADES.find((u) => u.id === g.parentOf(def.id));
-      const pname = parentDef ? parentDef.name : 'le pacte précédent';
-      eff.innerHTML = `<span class="nxt">🔒 Invoque d'abord « ${pname} » pour débloquer ce pacte.</span>`;
+      // Noms des pactes prérequis (encore non achetés) à invoquer d'abord.
+      const missing = g.prereqIds(def.id)
+        .filter((pid) => g.upgradeLevel(pid) < 1)
+        .map((pid) => (UPGRADES.find((u) => u.id === pid) || {}).name)
+        .filter(Boolean);
+      const pname = missing.length ? missing.map((n) => `« ${n} »`).join(' et ') : 'le pacte précédent';
+      eff.innerHTML = `<span class="nxt">🔒 Invoque d'abord ${pname} pour débloquer ce pacte.</span>`;
       buy.disabled = true;
-      buy.textContent = `🔒 Nécessite « ${pname} »`;
+      buy.textContent = `🔒 Nécessite ${pname}`;
       return;
     }
 
