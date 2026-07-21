@@ -293,7 +293,7 @@ class Game {
       meteore: 0, huntPriests: 0,
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
-      foudreDmg: 0, finisher: 0, envyLife: 0, slothSlow: 0,
+      foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -950,7 +950,10 @@ class Game {
 
   hitTarget(t, dmg, source) {
     if (t.dead) return;
-    t.hp -= dmg;
+    // Convoitise du Sacré (Léviathan) : +dégâts contre le sacré (prêtres/Vertus).
+    const hb = this.stats.holyDmg || 0;
+    const holy = (o) => (hb > 0 && (o.priest || (o.def && o.def.virtue))) ? (1 + hb) : 1;
+    t.hp -= dmg * holy(t);
     t.shake = 0.25;
     this.spawnHitParticles(t);
 
@@ -959,7 +962,7 @@ class Game {
       for (const o of this.targets) {
         if (o === t || o.dead) continue;
         if (Math.abs(o.gx - t.gx) <= 1 && Math.abs(o.gy - t.gy) <= 1) {
-          o.hp -= dmg * this.stats.splash;
+          o.hp -= dmg * this.stats.splash * holy(o);
           o.shake = 0.2;
           if (o.hp <= 0) this.destroyTarget(o);
         }
@@ -986,8 +989,8 @@ class Game {
     this.runSouls += gain;
     this.runDestroyed++;
     this.totalDestroyed++;
-    // Convoitise Mortelle (Léviathan) : chaque destruction prolonge la survie.
-    if (this.stats.envyLife > 0 && this.phase === 'playing') this.timeLeft += this.stats.envyLife;
+    // Convoitise du Sacré (Léviathan) : exorciser un prêtre te rend du temps.
+    if (t.priest && this.stats.priestSteal > 0 && this.phase === 'playing') this.timeLeft += this.stats.priestSteal;
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) {
       this.grid[t.gy][t.gx].scorched = true;
       this.grid[t.gy][t.gx].occupied = false;

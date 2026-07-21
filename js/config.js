@@ -556,9 +556,10 @@ const PRIMORDIAL_DEMONS = [
   },
   {
     id: 'envie', sin: 'Envie', name: 'Léviathan', emoji: '🐍', color: '#3fb27f',
-    pact: 'Convoitise Mortelle',
-    desc: 'Tu convoites la vie des mortels : chaque destruction prolonge ta longévité de +0,4 s.',
-    apply: (s) => { s.envyLife += 0.4; },
+    pact: 'Convoitise du Sacré',
+    desc: 'Tu convoites le pouvoir des saints : chaque prêtre exorcisé te rend ' +
+          '2,5 s de survie, et tu infliges +30% de dégâts aux prêtres et aux Vertus.',
+    apply: (s) => { s.priestSteal += 2.5; s.holyDmg += 0.3; },
   },
   {
     id: 'gourmandise', sin: 'Gourmandise', name: 'Belzébuth', emoji: '🪰', color: '#8bbf3f',
