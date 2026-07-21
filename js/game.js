@@ -303,6 +303,10 @@ class Game {
     for (const dmn of PRIMORDIAL_DEMONS) {
       if (this.demonUnlocked(dmn.id)) dmn.apply(s);
     }
+    // Malus du Serment du Chaos Absolu : ta puissance démoniaque attire les
+    // exorcistes → le temps avant exorcisme est divisé par 2 (appliqué sur le
+    // total, après tous les bonus de longévité).
+    if (this.upgradeLevel('pacte_libre') >= 1) s.lifespan *= 0.5;
     // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
     s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
