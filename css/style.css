@@ -706,3 +706,8 @@ html, body {
 .hud-biome b { color: #bfe0a8; font-family: Georgia, serif; font-weight: bold; }
 .hud-respawn b { color: #9be89b; }
 .hud-respawn .hud-ico { color: #9be89b; animation: pulseLow 1.4s ease-in-out infinite; }
+
+/* Pacte masqué : le précédent n'est pas encore acheté → « ? » mystérieux. */
+.tree-node.masked { border-style: dashed; opacity: .8; }
+.tree-node.masked .tn-emoji { filter: none; }
+.tree-node.masked .tn-name { color: var(--muted); letter-spacing: 3px; }
