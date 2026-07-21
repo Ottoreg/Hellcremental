@@ -225,9 +225,11 @@ const UPGRADES = [
     id: 'pacte_libre', name: 'Serment du Chaos Absolu', emoji: '♾️',
     desc: 'Brise la loi des voies. Une fois ce serment scellé, la règle du choix ' +
           'unique ne s\'applique plus : tu peux emprunter TOUTES les voies ' +
-          '(Magie, Légions et Clic) au lieu d\'une seule.',
+          '(Magie, Légions et Clic) au lieu d\'une seule. MALUS : ta puissance ' +
+          'démoniaque devient si voyante que les exorcistes ciblent tes pouvoirs ' +
+          'bien plus vite — le temps avant exorcisme est DIVISÉ PAR 2.',
     baseCost: 1000000, mult: 1, max: 1,
-    effect: () => 'Toutes les voies deviennent accessibles',
+    effect: () => 'Toutes les voies accessibles · MALUS : longévité ÷2',
     apply: (s, n) => { s.voiesLibres = n; },
   },
   {
