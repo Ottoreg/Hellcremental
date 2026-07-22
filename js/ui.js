@@ -860,7 +860,8 @@ class UI {
 
     const playing = g.phase === 'playing';
     if (playing) {
-      const frac = g.stats ? g.timeLeft / g.stats.lifespan : 0;
+      const timerMax = g.worldEnd ? WORLDEND_TIME : (g.stats ? g.stats.lifespan : 1);
+      const frac = timerMax ? g.timeLeft / timerMax : 0;
       this.$('timer-text').textContent = g.timeLeft.toFixed(1) + 's';
       // Progression fondée sur ce qui reste debout (régresse si des vivants renaissent).
       const alive = g.aliveTargetCount();
