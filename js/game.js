@@ -22,6 +22,9 @@ class Game {
     this.prestigePoints = 0;   // points de prestige à dépenser
     this.prestigeUpgrades = {};// améliorations permanentes achetées (id -> niveau)
     this.prestigeCount = 0;    // nombre de prestiges effectués
+    this.everBought = {};      // pactes déjà acquis un jour (révélés à jamais)
+    this.prestigeHistory = []; // stats de chaque prestige (consultables)
+    this.cycleRavagesStart = 0;// ravages au début du cycle de prestige courant
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
@@ -79,6 +82,9 @@ class Game {
       prestigePoints: this.prestigePoints,
       prestigeUpgrades: this.prestigeUpgrades,
       prestigeCount: this.prestigeCount,
+      everBought: this.everBought,
+      prestigeHistory: this.prestigeHistory,
+      cycleRavagesStart: this.cycleRavagesStart,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -135,6 +141,11 @@ class Game {
     this.prestigePoints = d.prestigePoints || 0;
     this.prestigeUpgrades = d.prestigeUpgrades || {};
     this.prestigeCount = d.prestigeCount || 0;
+    this.everBought = d.everBought || {};
+    // Les pactes actuellement possédés comptent aussi comme « déjà découverts ».
+    for (const id in this.upgrades) this.everBought[id] = true;
+    this.prestigeHistory = Array.isArray(d.prestigeHistory) ? d.prestigeHistory : [];
+    this.cycleRavagesStart = d.cycleRavagesStart || 0;
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
@@ -157,6 +168,7 @@ class Game {
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
+    this.everBought = {}; this.prestigeHistory = []; this.cycleRavagesStart = 0;
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -252,6 +264,15 @@ class Game {
     if (!this.canPrestige()) return false;
     this.prestigePoints += PRESTIGE_REWARD;
     this.prestigeCount += 1;
+    // Stats du cycle qui s'achève (consultables dans les options).
+    this.prestigeHistory.push({
+      n: this.prestigeCount,
+      ravages: Math.max(0, this.totalDestroyed - (this.cycleRavagesStart || 0)),
+      niveau: this.level,
+      points: PRESTIGE_REWARD,
+      date: Date.now(),
+    });
+    this.cycleRavagesStart = this.totalDestroyed;
     // Remise à zéro de la progression.
     this.souls = 0;
     this.level = 1;
@@ -328,6 +349,7 @@ class Game {
     if (this.souls < cost) return false;
     this.souls -= cost;
     this.upgrades[id] = n + 1;
+    this.everBought[id] = true; // pacte découvert : révélé à jamais
     this.save();
     // Applique à chaud si une vie est en cours.
     if (this.phase === 'playing') this.computeStats(false);
