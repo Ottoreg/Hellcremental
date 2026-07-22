@@ -277,6 +277,25 @@ class Game {
   prestigeUnlocked() { return this.allVirtuesDefeated(); }
   canPrestige() { return this.prestigeUnlocked(); }
 
+  /* [DEV/TEST] Passe instantanément `count` niveaux sans jouer : marque comme
+   * vaincues toutes les Vertus traversées (débloque donc le Prestige) et donne
+   * quelques âmes. Outil temporaire pour tester rapidement Prestige/Belial. */
+  devSkipLevels(count = 10) {
+    const from = this.level + 1;
+    const to = this.level + count;
+    for (let L = from; L <= to; L++) {
+      const v = virtueForLevel(L);
+      if (v && !this.virtuesDefeated[v.id]) {
+        this.virtuesDefeated[v.id] = true;
+        if (this.allVirtuesDefeated()) this.justUnlockedPrestige = true;
+      }
+    }
+    this.souls += count * 500;
+    this.level = to;
+    this.bestLevel = Math.max(this.bestLevel, this.level);
+    this.save();
+  }
+
   /* Prestige : remet la progression à zéro et octroie 1 point de prestige.
    * Conserve les points/améliorations de prestige et les records. */
   doPrestige() {

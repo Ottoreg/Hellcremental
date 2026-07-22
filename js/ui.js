@@ -58,6 +58,11 @@ class UI {
       this.game.save();
       this.refresh();
     });
+    // [DEV/TEST] Passer 10 niveaux d'un coup (marque les Vertus traversées).
+    this.$('skip-btn').addEventListener('click', () => {
+      this.game.devSkipLevels(10);
+      this.refresh();
+    });
 
     // --- Boutique Démoniaque (Prestige) ---
     this.$('prestige-btn').addEventListener('click', () => this.openPrestige());
