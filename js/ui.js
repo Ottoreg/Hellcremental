@@ -148,6 +148,8 @@ class UI {
   startWorldEnd() {
     this.$('start-screen').classList.add('hidden');
     this.$('prestige-modal').classList.add('hidden');
+    this.$('overlay').classList.add('hidden'); // ferme l'écran de fin de niveau qui gênait
+    this._resultWasWorldEnd = false;
     this.tryLockLandscape();
     this.setView('game');
     this.game.startWorldEnd();
