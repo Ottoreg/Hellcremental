@@ -44,7 +44,9 @@ class UI {
     // Vue de fin (côté Chaos) : relancer / niveau suivant.
     this.$('overlay-btn').addEventListener('click', () => {
       this.$('overlay').classList.add('hidden');
-      this.startRun();
+      // Après une Fin du Monde (gagnée ou perdue), retour à l'accueil.
+      if (this._resultWasWorldEnd) { this._resultWasWorldEnd = false; this.showStartScreen(); }
+      else this.startRun();
     });
     // Aller améliorer ses pouvoirs (mobile) sans fermer la vue de fin :
     // elle réapparaît en revenant sur Chaos.
@@ -143,6 +145,15 @@ class UI {
     this.refresh();
   }
 
+  startWorldEnd() {
+    this.$('start-screen').classList.add('hidden');
+    this.$('prestige-modal').classList.add('hidden');
+    this.tryLockLandscape();
+    this.setView('game');
+    this.game.startWorldEnd();
+    this.refresh();
+  }
+
   showStartScreen() {
     // Propose « Reprendre » si une partie est sauvegardée.
     this.$('resume-btn').classList.toggle('hidden', !this.game.hasResumableRun());
@@ -174,10 +185,17 @@ class UI {
     } else if (g.prestigeCount > 0) {
       prestige = `<div class="vt-prestige">🔻 ${g.prestigeCount} prestige${g.prestigeCount > 1 ? 's' : ''} · ${g.prestigePoints} point${g.prestigePoints > 1 ? 's' : ''}</div>`;
     }
+    // Épreuve « Fin du Monde » : proposée dès que le niveau 70 est vaincu.
+    let worldEnd = '';
+    if (g.canWorldEnd()) {
+      worldEnd = `<button id="vt-worldend-btn" class="vt-worldend-btn">🌍 Fin du Monde — les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</button>`;
+    }
     el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
-      `<div class="vt-pips">${pips}</div>${prestige}`;
+      `<div class="vt-pips">${pips}</div>${prestige}${worldEnd}`;
     const b = el.querySelector('#vt-prestige-btn');
     if (b) b.addEventListener('click', () => this.openPrestige());
+    const w = el.querySelector('#vt-worldend-btn');
+    if (w) w.addEventListener('click', () => this.startWorldEnd());
   }
 
   /* Bascule entre la vue jeu et la vue boutique (mobile). */
@@ -275,8 +293,10 @@ class UI {
     // Section « Renaître » : disponible une fois les 7 Vertus vaincues.
     const rb = this.$('prestige-rebirth');
     if (g.prestigeUnlocked()) {
-      rb.innerHTML = `<button id="do-prestige" class="big-btn">🔻 Renaître — remet la progression à 0 · +${PRESTIGE_REWARD} points</button>`;
+      rb.innerHTML = `<button id="do-prestige" class="big-btn">🔻 Renaître — remet la progression à 0 · +${PRESTIGE_REWARD} points</button>` +
+        `<button id="do-worldend" class="big-btn ghost">🌍 Fin du Monde — épreuve des 7 Vertus · +${WORLDEND_REWARD} pts</button>`;
       rb.querySelector('#do-prestige').addEventListener('click', () => this.confirmPrestige());
+      rb.querySelector('#do-worldend').addEventListener('click', () => this.startWorldEnd());
     } else {
       const c = g.virtuesDefeatedCount();
       rb.innerHTML = `<p class="prestige-locked">🔒 Vaincs les 7 Vertus (<b>${c}/${VIRTUES.length}</b>) pour pouvoir renaître.</p>`;
@@ -850,10 +870,15 @@ class UI {
       const biome = g.currentBiome ? g.currentBiome() : null;
       this.$('biome-text').textContent = biome ? biome.name : '';
       this.$('hud-respawn').classList.toggle('hidden', !g.respawnActive);
+      // Épreuve Fin du Monde : progression des grilles.
+      const we = g.worldEnd;
+      this.$('hud-worldend').classList.toggle('hidden', !we);
+      if (we) this.$('worldend-text').textContent = `Vertu ${we.stage}/${we.total}`;
       // Le compte à rebours s'affole dans les 5 dernières secondes.
       this.$('hud').classList.toggle('low', g.timeLeft <= 5);
       // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
-      this.$('nav-timer-fill').style.width = (frac * 100) + '%';
+      // (Le chrono peut dépasser la longévité en Fin du Monde → on borne à 100%.)
+      this.$('nav-timer-fill').style.width = (Math.min(1, frac) * 100) + '%';
       // Indicateur de drainage par les prêtres.
       const drain = g.priestDrain || 0;
       this.$('hud-drain').classList.toggle('hidden', drain <= 0);
@@ -862,6 +887,7 @@ class UI {
       this.$('nav-timer-fill').style.width = '100%';
       this.$('hud-drain').classList.add('hidden');
       this.$('hud-respawn').classList.add('hidden');
+      this.$('hud-worldend').classList.add('hidden');
     }
 
     // Fiche de pacte ouverte : on la garde à jour (coût/abordable).
@@ -1097,6 +1123,40 @@ class UI {
     // La vue de fin vit côté Chaos : on s'assure d'y être.
     this.setView('game');
     const mobile = this.isMobile();
+
+    // --- Fin du Monde (épreuve d'endurance) : écran dédié ---
+    if (r.worldEnd) {
+      this._resultWasWorldEnd = true;
+      if (r.worldEnd === 'won') {
+        title.textContent = '🌍 Fin du Monde vaincue !';
+        title.className = 'cleared';
+        body.innerHTML = `
+          <p class="ov-lead">Les 7 Vertus sont tombées d'affilée. L'apocalypse t'appartient.</p>
+          <div class="ov-stats">
+            <div><span>${r.stages}/${r.stages}</span><label>Vertus terrassées</label></div>
+            <div><span>💀 ${this.fmt(r.souls)}</span><label>âmes récoltées</label></div>
+            <div><span>+${r.prestigeBonus}</span><label>points de prestige</label></div>
+          </div>
+          <p class="ov-hint">Les points sont crédités. Renais quand tu veux dans la Boutique Démoniaque.</p>`;
+        btn.textContent = '🔻 Retour';
+      } else {
+        title.textContent = '✝️ Fin du Monde interrompue';
+        title.className = 'exorcised';
+        body.innerHTML = `
+          <p class="ov-lead">Les prières t'ont repoussé face à la ${r.stage}<sup>e</sup> Vertu. L'épreuve se retente depuis le début.</p>
+          <div class="ov-stats">
+            <div><span>${r.stage - 1}/${r.stages}</span><label>Vertus vaincues</label></div>
+            <div><span>💀 ${this.fmt(r.souls)}</span><label>âmes récoltées</label></div>
+          </div>
+          <p class="ov-hint">Renforce-toi, puis relance la Fin du Monde depuis l'accueil.</p>`;
+        btn.textContent = '🔻 Retour';
+      }
+      this.$('overlay-improve').classList.add('hidden');
+      ov.classList.remove('hidden');
+      this.refresh();
+      return;
+    }
+    this._resultWasWorldEnd = false;
 
     if (r.cleared) {
       title.textContent = '🔥 Niveau anéanti ! 🔥';
