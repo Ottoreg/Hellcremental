@@ -879,7 +879,8 @@ class Game {
   startWorldEnd() {
     this.pendingRun = null;
     this.worldEnd = { stage: 1, total: WORLDEND_STAGES };
-    this.computeStats(true);           // stats fraîches + chrono = longévité
+    this.computeStats(true);           // stats fraîches
+    this.timeLeft = WORLDEND_TIME;     // chrono fixe : 60 s pour toute l'épreuve
     this.runDestroyed = 0;
     this.runSouls = 0;
     this.buildWorldEndStage();
@@ -907,9 +908,7 @@ class Game {
     const we = this.worldEnd;
     if (we.stage >= we.total) return this.winWorldEnd();
     we.stage++;
-    // Le chrono continue : la grille suivante apporte son budget, le reliquat
-    // se cumule (aller vite est récompensé).
-    this.timeLeft += this.stats.lifespan;
+    // Le chrono ne se recharge pas : les 60 s valent pour toute l'épreuve.
     this.buildWorldEndStage();
     this.save();
     this.onChange();
@@ -1100,6 +1099,10 @@ class Game {
         }
       }
     }
+
+    // Fin du Monde : la survie ne dépasse jamais 60 s (même avec le vol de
+    // temps de Léviathan).
+    if (this.worldEnd && this.timeLeft > WORLDEND_TIME) this.timeLeft = WORLDEND_TIME;
 
     // Progression : niveau nettoyé quand plus aucune cible n'est debout.
     if (this.aliveTargetCount() === 0) {

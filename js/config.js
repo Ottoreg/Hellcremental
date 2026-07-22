@@ -111,6 +111,7 @@ const WORLDEND_STAGES = VIRTUES.length;   // 7 grilles, une par Vertu
 const WORLDEND_BASE_LEVEL = 70;           // difficulté de base des grilles
 const WORLDEND_STEP = 3;                  // +3 « niveaux » de difficulté par grille
 const WORLDEND_REWARD = 5;                // points de prestige à la victoire
+const WORLDEND_TIME = 60;                 // survie plafonnée à 60 s pour toute l'épreuve
 
 /* -------------------------------------------------------------------------
  * Biomes : les 70 premiers niveaux traversent 7 zones (10 niveaux chacune),
