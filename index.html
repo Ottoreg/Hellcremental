@@ -58,6 +58,7 @@
         </div>
         <button id="install-btn" class="icon-btn hidden" title="Installer l'application">📲</button>
         <button id="prestige-btn" class="icon-btn hidden" title="Boutique Démoniaque (Prestige)">🔻</button>
+        <button id="lie-btn" class="icon-btn hidden" title="Mensonges de Belial">🎭</button>
         <button id="cheat-btn" class="icon-btn" title="+1 milliard d'âmes (test)">💰</button>
         <button id="menu-btn" class="icon-btn" title="Options">⚙️</button>
       </div>
@@ -237,7 +238,20 @@
         <p class="prestige-points-line">Points de Prestige : <b id="prestige-points">0</b>
            <span id="prestige-count"></span></p>
         <div id="prestige-rebirth"></div>
+        <div id="prestige-incarnation"></div>
         <div id="prestige-grid" class="prestige-grid"></div>
+      </div>
+    </div>
+
+    <!-- Interface de Mensonge de Belial -->
+    <div id="lie-modal" class="hidden">
+      <div class="lie-card">
+        <button id="lie-close" class="menu-close" title="Fermer">✕</button>
+        <h2>🎭 Mensonges de Belial</h2>
+        <p class="lie-sub">Hors combat, gonfle une valeur jusqu'à la prochaine Vertu.
+           Rends ton mensonge <b>vrai</b> pour un point de prestige bonus — sinon,
+           tu paies le prix.</p>
+        <div id="lie-body"></div>
       </div>
     </div>
 

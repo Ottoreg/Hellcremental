@@ -455,6 +455,15 @@ const UPGRADES = [
     effect: (n) => `Furie 10 s · clic ×${6 + n * 2} · zone ${1 + Math.min(2, Math.floor(n / 2))} case(s) · morts définitives · 1×/niveau`,
     apply: (s, n) => { s.finisher = n; },
   },
+  // Pacte spécial de Belial (démon du Mensonge). Se débloque en incarnant Belial.
+  {
+    id: 'mensonges', name: 'Mensonges', emoji: '🎭', special: 'belial',
+    desc: 'Le souffle de Belial gonfle tes tromperies : augmente l\'ampleur ' +
+          'maximale de tes mensonges (facteur de multiplication).',
+    baseCost: 25000, mult: 1.5, max: 10,
+    effect: (n) => `Mensonge jusqu'à ×${5 + n}`,
+    apply: (s, n) => { s.lieBonus = n; },
+  },
 ];
 
 /* Attaques actives : métadonnées (recharge ; `once` = une seule fois par niveau). */
@@ -643,3 +652,34 @@ const PRESTIGE_UPGRADES = [
     apply: (s, n) => { s.servantDmg += 0.25 * n; },
   },
 ];
+
+/* -------------------------------------------------------------------------
+ * Incarnations — après avoir prestigé au moins une fois, le joueur peut
+ * incarner un DÉMON PRIMORDIAL qui débloque une mécanique unique.
+ * Premier disponible : Belial, le démon du Mensonge.
+ * ------------------------------------------------------------------------- */
+const INCARNATIONS = [
+  {
+    id: 'belial', name: 'Belial', title: 'Démon du Mensonge', emoji: '🎭',
+    color: '#b06bff', available: true,
+    desc: 'Tu peux MENTIR au jeu. Hors combat, gonfle une statistique ou tes ' +
+          'âmes (×1,5 à ×5 et plus). Le mensonge tient jusqu\'à la prochaine ' +
+          'Vertu : si tu l\'as rendu vrai, tu gagnes un point de prestige bonus ; ' +
+          'sinon, tu paies le prix (malus de stat ou dette d\'âmes).',
+  },
+  { id: 'soon2', name: '???', title: 'À venir', emoji: '🔒', color: '#555', available: false,
+    desc: 'Un autre démon primordial sommeille encore...' },
+  { id: 'soon3', name: '???', title: 'À venir', emoji: '🔒', color: '#555', available: false,
+    desc: 'Un autre démon primordial sommeille encore...' },
+];
+
+/* Cibles possibles d'un mensonge (statistiques « plus = mieux » + âmes). */
+const LIE_TARGETS = [
+  { id: 'damage',      name: 'Dégâts',         stat: 'damage',      fmt: (v) => Math.round(v) },
+  { id: 'moveSpeed',   name: 'Vitesse',        stat: 'moveSpeed',   fmt: (v) => v.toFixed(1) },
+  { id: 'clickDamage', name: 'Dégâts de clic', stat: 'clickDamage', fmt: (v) => Math.round(v) },
+  { id: 'souls',       name: 'Âmes',           stat: null,          fmt: (v) => Math.round(v) },
+];
+
+const LIE_MIN = 1.5;      // multiplicateur minimum d'un mensonge
+const LIE_BASE_MAX = 5;   // multiplicateur maximum de base (avant pacte Mensonges)
