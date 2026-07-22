@@ -227,7 +227,26 @@ class UI {
   openMenu() {
     this.$('import-msg').textContent = '';
     this.$('export-code').value = '';
+    this.renderPrestigeStats();
     this.$('menu').classList.remove('hidden');
+  }
+
+  /* Historique des prestiges affiché dans les options. */
+  renderPrestigeStats() {
+    const g = this.game;
+    const sec = this.$('prestige-stats-section');
+    if (!sec) return;
+    if (!g.prestigeCount) { sec.hidden = true; return; }
+    sec.hidden = false;
+    const totalPts = g.prestigeHistory.reduce((t, p) => t + (p.points || 0), 0);
+    const rows = g.prestigeHistory.slice().reverse().map((p) =>
+      `<div class="ps-row"><span class="ps-n">Prestige ${p.n}</span>` +
+      `<span class="ps-detail">🔥 ${this.fmt(p.ravages || 0)} ravages · niv. ${p.niveau || '?'} · +${p.points || 0} pts</span></div>`
+    ).join('');
+    this.$('prestige-stats').innerHTML =
+      `<p class="ps-summary"><b>${g.prestigeCount}</b> prestige${g.prestigeCount > 1 ? 's' : ''} · ` +
+      `<b>${totalPts}</b> points gagnés · <b>${g.prestigePoints}</b> à dépenser</p>` +
+      `<div class="ps-list">${rows}</div>`;
   }
   closeMenu() { this.$('menu').classList.add('hidden'); }
 
@@ -282,6 +301,9 @@ class UI {
       'améliorations permanentes.');
     if (!ok) return;
     g.doPrestige();
+    // On ferme l'écran de fin de niveau (« niveau suivant ») s'il était ouvert
+    // et on revient sur l'écran de présentation du jeu.
+    this.$('overlay').classList.add('hidden');
     this.renderPrestige();
     this.refresh();
     this.showStartScreen();                 // progression remise à zéro → accueil
@@ -594,6 +616,8 @@ class UI {
   isMasked(id) {
     const node = SKILL_TREE.find((n) => n.id === id);
     if (!node) return false;
+    // Déjà acquis lors d'un prestige précédent : révélé à jamais.
+    if (this.game.everBought[id]) return false;
     // Masqué tant qu'un prérequis n'a pas été acheté (niveau 0).
     const prereqs = this.game.prereqIds(id);
     if (!prereqs.length) return false;
