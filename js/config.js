@@ -102,6 +102,16 @@ function virtueForLevel(level) {
   return (tier >= 1 && tier <= VIRTUES.length) ? VIRTUES[tier - 1] : null;
 }
 
+/* -------- Mode « Fin du Monde » (épreuve d'endurance post-niveau 70) --------
+ * Une fois le niveau 70 vaincu (les 7 Vertus tombées), le joueur peut, au lieu
+ * de prestiger tout de suite, lancer cette épreuve : un seul long niveau formé
+ * de 7 grilles enchaînées, chacune gardée par une Vertu qui revient à son tour.
+ * Nettoyer une grille fait apparaître la suivante. Vaincre les 7 → +5 points. */
+const WORLDEND_STAGES = VIRTUES.length;   // 7 grilles, une par Vertu
+const WORLDEND_BASE_LEVEL = 70;           // difficulté de base des grilles
+const WORLDEND_STEP = 3;                  // +3 « niveaux » de difficulté par grille
+const WORLDEND_REWARD = 5;                // points de prestige à la victoire
+
 /* -------------------------------------------------------------------------
  * Biomes : les 70 premiers niveaux traversent 7 zones (10 niveaux chacune),
  * de la campagne à la métropole, chacune avec ses cibles et sa couleur de sol.

@@ -35,6 +35,10 @@ class Game {
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
+    // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
+    // { stage, total } quand active, sinon null.
+    this.worldEnd = null;
+
     // État de la vie en cours
     this.phase = 'idle';       // 'playing' | 'exorcised' | 'cleared' | 'idle'
     this.timeLeft = 0;
@@ -102,7 +106,8 @@ class Game {
       run: null,
     };
     // On enregistre la partie en cours pour pouvoir la reprendre à l'identique.
-    if (this.phase === 'playing') {
+    // Exception : l'épreuve « Fin du Monde » ne se reprend pas (tout ou rien).
+    if (this.phase === 'playing' && !this.worldEnd) {
       obj.run = {
         level: this.level,
         timeLeft: this.timeLeft,
@@ -165,6 +170,7 @@ class Game {
     this.pendingPrestigeBonus = d.pendingPrestigeBonus || 0;
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
+    this.worldEnd = null; // une épreuve en cours ne survit pas à un rechargement
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
     return true;
   }
@@ -189,6 +195,7 @@ class Game {
     this.incarnation = null; this.lie = null; this.lieMalus = null;
     this.soulDebt = 0; this.pendingPrestigeBonus = 0; this.lastLieResult = null;
     this.totalDestroyed = 0; this.bestLevel = 1;
+    this.worldEnd = null;
     this.pendingRun = null;
     this.phase = 'idle';
     this.save();
@@ -545,13 +552,13 @@ class Game {
    * graine du joueur. Le même (graine, niveau) produit toujours le même niveau,
    * ce qui rend la partie reproductible sur n'importe quel appareil.
    * Renvoie { gridSize, targets } (données brutes, sans état de rendu). */
-  generateLevel(level) {
+  generateLevel(level, opts = {}) {
     const biome = this.biomeFor(level);
     const pool = this.buildWeightedPool(biome.pool);
     const hpMult = 1 + (level - 1) * 0.35;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
-    const boss = isBossLevel(level);
+    const boss = opts.forceBoss || isBossLevel(level);
     const nPriests = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
 
     // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
@@ -571,7 +578,9 @@ class Game {
       // Boss au centre (tous les 10 niveaux). Aux dizaines 10→70 c'est une
       // des 7 Vertus ; au-delà, on retombe sur les boss génériques.
       if (boss) {
-        const v = virtueForLevel(level);
+        const v = opts.forceVirtueId
+          ? VIRTUES.find((x) => x.id === opts.forceVirtueId)
+          : virtueForLevel(level);
         const bid = v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
         push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
       }
@@ -601,11 +610,15 @@ class Game {
     return { gridSize: CONFIG.GRID_MIN, targets: [] };
   }
 
-  /* Construit la grille + les cibles jouables à partir de données brutes. */
-  buildRunState(gridSize, rawTargets, scorched) {
+  /* Construit la grille + les cibles jouables à partir de données brutes.
+   * opts.biomeLevel force le thème visuel (ex. Fin du Monde) ; opts.respawn
+   * force l'état de renaissance des vivants. */
+  buildRunState(gridSize, rawTargets, scorched, opts = {}) {
     this.gridSize = gridSize;
-    this.biome = this.biomeFor(this.level);                 // couleur de sol + thème
-    this.respawnActive = this.level >= RESPAWN_MIN_LEVEL;    // réapparition des vivants
+    const bl = (opts.biomeLevel != null) ? opts.biomeLevel : this.level;
+    this.biome = this.biomeFor(bl);                         // couleur de sol + thème
+    this.respawnActive = (opts.respawn != null)
+      ? opts.respawn : (this.level >= RESPAWN_MIN_LEVEL);    // réapparition des vivants
     this.grid = [];
     for (let y = 0; y < gridSize; y++) {
       const row = [];
@@ -858,6 +871,65 @@ class Game {
     this.onChange();
   }
 
+  /* ---------------------- Fin du Monde (épreuve d'endurance) ---------------------- */
+  /* Disponible une fois les 7 Vertus vaincues (niveau 70 battu). */
+  canWorldEnd() { return this.prestigeUnlocked(); }
+
+  /* Lance l'épreuve : un seul long niveau de 7 grilles enchaînées. */
+  startWorldEnd() {
+    this.pendingRun = null;
+    this.worldEnd = { stage: 1, total: WORLDEND_STAGES };
+    this.computeStats(true);           // stats fraîches + chrono = longévité
+    this.runDestroyed = 0;
+    this.runSouls = 0;
+    this.buildWorldEndStage();
+    this.phase = 'playing';
+    this.refitCamera();
+    this.save();
+    this.onChange();
+  }
+
+  /* Construit la grille de la Vertu courante de l'épreuve. */
+  buildWorldEndStage() {
+    const stage = this.worldEnd.stage;
+    const virtue = VIRTUES[stage - 1];
+    const effLevel = WORLDEND_BASE_LEVEL + stage * WORLDEND_STEP; // difficulté croissante
+    const gen = this.generateLevel(effLevel, { forceBoss: true, forceVirtueId: virtue.id });
+    // Thème visuel varié par grille ; pas de renaissance (nettoyer = avancer).
+    this.buildRunState(gen.gridSize, gen.targets, null,
+      { biomeLevel: WORLDEND_BASE_LEVEL + stage, respawn: false });
+    this.totalToDestroy = this.targets.length;
+    this.refitCamera();
+  }
+
+  /* Grille nettoyée pendant l'épreuve : Vertu suivante ou victoire finale. */
+  onWorldEndClear() {
+    const we = this.worldEnd;
+    if (we.stage >= we.total) return this.winWorldEnd();
+    we.stage++;
+    // Le chrono continue : la grille suivante apporte son budget, le reliquat
+    // se cumule (aller vite est récompensé).
+    this.timeLeft += this.stats.lifespan;
+    this.buildWorldEndStage();
+    this.save();
+    this.onChange();
+  }
+
+  /* Les 7 Vertus vaincues d'affilée : +5 points de prestige. */
+  winWorldEnd() {
+    this.prestigePoints += WORLDEND_REWARD;
+    const result = {
+      cleared: true, worldEnd: 'won', prestigeBonus: WORLDEND_REWARD,
+      destroyed: this.runDestroyed, total: this.runDestroyed,
+      souls: this.runSouls, level: this.level, stages: WORLDEND_STAGES,
+    };
+    this.worldEnd = null;
+    this.phase = 'cleared';
+    this.save();
+    this.onChange();
+    this.onEnd(result);
+  }
+
   buildWeightedPool(poolDef) {
     const arr = [];
     for (const [id, w] of Object.entries(poolDef))
@@ -1030,7 +1102,10 @@ class Game {
     }
 
     // Progression : niveau nettoyé quand plus aucune cible n'est debout.
-    if (this.aliveTargetCount() === 0) this.endRun(true);
+    if (this.aliveTargetCount() === 0) {
+      if (this.worldEnd) this.onWorldEndClear(); // grille suivante / victoire
+      else this.endRun(true);
+    }
   }
 
   /* Onde de choc du Colosse (premier coup sur un bâtiment). */
@@ -1324,6 +1399,22 @@ class Game {
   /* ---------------------- Fin de vie ---------------------- */
   endRun(cleared) {
     if (this.phase !== 'playing') return;
+    // Fin du Monde : la victoire d'une grille est gérée par onWorldEndClear ;
+    // ici on ne traite que l'exorcisme (échec de l'épreuve).
+    if (this.worldEnd) {
+      const stage = this.worldEnd.stage;
+      this.worldEnd = null;
+      this.phase = 'exorcised';
+      this.save();
+      this.onChange();
+      this.onEnd({
+        cleared: false, worldEnd: 'lost',
+        stage, stages: WORLDEND_STAGES,
+        destroyed: this.runDestroyed, total: this.totalToDestroy,
+        souls: this.runSouls, level: this.level,
+      });
+      return;
+    }
     const result = {
       cleared,
       destroyed: this.runDestroyed,
