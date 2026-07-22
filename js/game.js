@@ -25,6 +25,13 @@ class Game {
     this.everBought = {};      // pactes déjà acquis un jour (révélés à jamais)
     this.prestigeHistory = []; // stats de chaque prestige (consultables)
     this.cycleRavagesStart = 0;// ravages au début du cycle de prestige courant
+    // Incarnation d'un démon primordial (débloqué après ≥1 prestige).
+    this.incarnation = null;   // ex. 'belial'
+    this.lie = null;           // mensonge de Belial actif { target, factor, claimed, base, soulsEarned }
+    this.lieMalus = null;      // pénalité d'un mensonge non tenu { target, factor }
+    this.soulDebt = 0;         // dette d'âmes à rembourser (mensonge sur les âmes)
+    this.pendingPrestigeBonus = 0; // points de prestige bonus (mensonges tenus)
+    this.lastLieResult = null; // dernier verdict de mensonge (feedback UI)
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
@@ -85,6 +92,11 @@ class Game {
       everBought: this.everBought,
       prestigeHistory: this.prestigeHistory,
       cycleRavagesStart: this.cycleRavagesStart,
+      incarnation: this.incarnation,
+      lie: this.lie,
+      lieMalus: this.lieMalus,
+      soulDebt: this.soulDebt,
+      pendingPrestigeBonus: this.pendingPrestigeBonus,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -146,6 +158,11 @@ class Game {
     for (const id in this.upgrades) this.everBought[id] = true;
     this.prestigeHistory = Array.isArray(d.prestigeHistory) ? d.prestigeHistory : [];
     this.cycleRavagesStart = d.cycleRavagesStart || 0;
+    this.incarnation = d.incarnation || null;
+    this.lie = d.lie || null;
+    this.lieMalus = d.lieMalus || null;
+    this.soulDebt = d.soulDebt || 0;
+    this.pendingPrestigeBonus = d.pendingPrestigeBonus || 0;
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
@@ -169,6 +186,8 @@ class Game {
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
     this.everBought = {}; this.prestigeHistory = []; this.cycleRavagesStart = 0;
+    this.incarnation = null; this.lie = null; this.lieMalus = null;
+    this.soulDebt = 0; this.pendingPrestigeBonus = 0; this.lastLieResult = null;
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -262,29 +281,108 @@ class Game {
    * Conserve les points/améliorations de prestige et les records. */
   doPrestige() {
     if (!this.canPrestige()) return false;
-    this.prestigePoints += PRESTIGE_REWARD;
+    // Mensonges tenus depuis le dernier prestige : points bonus.
+    const bonus = this.pendingPrestigeBonus || 0;
+    const gained = PRESTIGE_REWARD + bonus;
+    this.prestigePoints += gained;
+    this.pendingPrestigeBonus = 0;
     this.prestigeCount += 1;
     // Stats du cycle qui s'achève (consultables dans les options).
     this.prestigeHistory.push({
       n: this.prestigeCount,
       ravages: Math.max(0, this.totalDestroyed - (this.cycleRavagesStart || 0)),
       niveau: this.level,
-      points: PRESTIGE_REWARD,
+      points: gained,
+      bonus,
       date: Date.now(),
     });
     this.cycleRavagesStart = this.totalDestroyed;
-    // Remise à zéro de la progression.
+    // Remise à zéro de la progression (les mensonges en cours sont annulés).
     this.souls = 0;
     this.level = 1;
     this.upgrades = {};
     this.offerings = {};
     this.virtuesDefeated = {};
+    this.lie = null; this.lieMalus = null; this.soulDebt = 0;
     this.pendingRun = null;
     this.phase = 'idle';
     this.computeStats(true);
     this.save();
     this.onChange();
     return true;
+  }
+
+  /* ---------------------- Incarnation (démon primordial) ---------------------- */
+  /* Le choix d'incarnation s'ouvre après avoir prestigé au moins une fois. */
+  canIncarnate() { return this.prestigeCount >= 1; }
+  setIncarnation(id) {
+    const inc = INCARNATIONS.find(i => i.id === id);
+    if (!inc || !inc.available || !this.canIncarnate()) return false;
+    this.incarnation = id;
+    // Changer d'incarnation annule un mensonge en cours.
+    this.lie = null; this.lieMalus = null;
+    this.computeStats(this.phase === 'playing' ? false : true);
+    this.save();
+    this.onChange();
+    return true;
+  }
+
+  /* ---------------------- Mensonge de Belial ---------------------- */
+  maxLieFactor() { return LIE_BASE_MAX + this.upgradeLevel('mensonges'); }
+  /* On ne peut mentir qu'en incarnant Belial, hors combat, et un seul à la fois. */
+  canLie() { return this.incarnation === 'belial' && this.phase !== 'playing' && !this.lie; }
+
+  /* Valeur courante d'une cible de mensonge (statistique ou âmes), sans mensonge. */
+  lieBaseValue(targetId) {
+    if (targetId === 'souls') return this.souls;
+    const st = this.stats || {};
+    return typeof st[targetId] === 'number' ? st[targetId] : 0;
+  }
+
+  /* Active un mensonge : gonfle la cible par `factor` jusqu'à la prochaine Vertu. */
+  activateLie(targetId, factor) {
+    if (!this.canLie()) return false;
+    const def = LIE_TARGETS.find(t => t.id === targetId);
+    if (!def) return false;
+    factor = Math.max(LIE_MIN, Math.min(this.maxLieFactor(), factor));
+    if (targetId === 'souls') {
+      const base = this.souls;
+      const claimed = Math.floor(base * factor);
+      this.lie = { target: 'souls', factor, claimed, base, soulsEarned: 0 };
+      this.souls = claimed; // gain immédiat à « rendre vrai »
+    } else {
+      const base = this.lieBaseValue(targetId);
+      const claimed = base * factor;
+      this.lie = { target: targetId, factor, claimed, base, soulsEarned: 0 };
+      this.computeStats(this.phase === 'playing' ? false : true);
+    }
+    this.lastLieResult = null;
+    this.save();
+    this.onChange();
+    return true;
+  }
+
+  /* Résout le mensonge en cours au moment où une Vertu est vaincue. */
+  resolveLieOnVirtue() {
+    // Fin d'un éventuel cycle de pénalité précédent.
+    this.lieMalus = null;
+    if (!this.lie) return;
+    const L = this.lie;
+    let success;
+    if (L.target === 'souls') {
+      const increase = Math.max(0, L.claimed - L.base);
+      success = L.soulsEarned >= increase;
+      if (!success) this.soulDebt += (increase - L.soulsEarned);
+    } else {
+      // Valeur réelle (sans mensonge) = stat gonflée / facteur.
+      const realBase = (this.stats[L.target] || 0) / L.factor;
+      success = realBase >= L.claimed;
+      if (!success) this.lieMalus = { target: L.target, factor: L.factor };
+    }
+    if (success) this.pendingPrestigeBonus += 1;
+    this.lastLieResult = { success, target: L.target, claimed: L.claimed };
+    this.lie = null;
+    this.computeStats(false);
   }
 
   /* --- Boutique Démoniaque : améliorations permanentes achetées en points --- */
@@ -342,6 +440,8 @@ class Game {
   buyUpgrade(id) {
     const def = UPGRADES.find(u => u.id === id);
     if (!def) return false;
+    // Pacte spécial d'incarnation (ex. Mensonges) : réservé au démon incarné.
+    if (def.special && this.incarnation !== def.special) return false;
     if (!this.isUnlocked(id)) return false; // parent pas encore invoqué
     const n = this.upgradeLevel(id);
     if (n >= def.max) return false;
@@ -374,7 +474,7 @@ class Game {
       stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
       foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
-      powerDmg: 0, servantDmg: 0,
+      powerDmg: 0, servantDmg: 0, lieBonus: 0,
     };
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
@@ -393,6 +493,14 @@ class Game {
     // exorcistes → le temps avant exorcisme est divisé par 2 (appliqué sur le
     // total, après tous les bonus de longévité).
     if (this.upgradeLevel('pacte_libre') >= 1) s.lifespan *= 0.5;
+    // Mensonge de Belial : gonfle la statistique visée jusqu'à la prochaine Vertu.
+    if (this.lie && this.lie.target !== 'souls' && typeof s[this.lie.target] === 'number') {
+      s[this.lie.target] *= this.lie.factor;
+    }
+    // Pénalité d'un mensonge non tenu : la statistique subit le malus inverse.
+    if (this.lieMalus && typeof s[this.lieMalus.target] === 'number') {
+      s[this.lieMalus.target] /= this.lieMalus.factor;
+    }
     // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
     s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
@@ -1074,12 +1182,20 @@ class Game {
       this.virtuesDefeated[t.def.virtue] = true;
       this.justDefeatedVirtue = t.def.virtue; // pour l'écran de fin
       if (this.allVirtuesDefeated()) this.justUnlockedPrestige = true;
+      this.resolveLieOnVirtue(); // vérité/mensonge tranché à la prochaine Vertu
     }
-    const gain = Math.max(1, Math.round(t.value * this.stats.soulMult));
+    let gain = Math.max(1, Math.round(t.value * this.stats.soulMult));
+    // Dette d'âmes d'un mensonge non tenu : remboursée sur les gains.
+    if (this.soulDebt > 0) {
+      const pay = Math.min(this.soulDebt, gain);
+      this.soulDebt -= pay; gain -= pay;
+    }
     this.souls += gain;
     this.runSouls += gain;
     this.runDestroyed++;
     this.totalDestroyed++;
+    // Mensonge sur les âmes : on comptabilise ce qui est réellement récolté.
+    if (this.lie && this.lie.target === 'souls') this.lie.soulsEarned += gain;
     // Convoitise du Sacré (Léviathan) : exorciser un prêtre te rend du temps.
     if (t.priest && this.stats.priestSteal > 0 && this.phase === 'playing') this.timeLeft += this.stats.priestSteal;
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) {

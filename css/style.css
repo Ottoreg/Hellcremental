@@ -787,3 +787,89 @@ html, body {
 }
 .ps-n { color: #ff9db0; font-weight: bold; }
 .ps-detail { color: var(--muted); text-align: right; }
+
+/* ---------------- Incarnation (démons primordiaux) ---------------- */
+.inc-head { font-size: 13px; color: #d0a0ff; margin: 12px 0 8px; }
+.inc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.inc-item {
+  background: rgba(20,10,26,.7); border: 1px solid #3a2450; border-radius: 12px;
+  padding: 12px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.inc-item.chosen { border-color: var(--inc, #b06bff); box-shadow: 0 0 14px -2px var(--inc, #b06bff); }
+.inc-item.locked { opacity: .55; }
+.inc-emoji { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 8px var(--inc, #b06bff)); }
+.inc-name { font-weight: bold; font-size: 14px; color: #e7d3ff; }
+.inc-title { font-size: 10.5px; color: var(--muted); }
+.inc-btn {
+  margin-top: 5px; padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer;
+  font-weight: bold; font-size: 12px; color: #150a1e;
+  background: linear-gradient(180deg, #c79bff, var(--inc, #8a4ad0));
+}
+.inc-btn:disabled { filter: grayscale(.5) brightness(.75); cursor: default; opacity: .85; }
+
+/* ---------------- Mensonges de Belial ---------------- */
+#lie-btn.ready { border-color: #b06bff; color: #d9b3ff; box-shadow: 0 0 12px rgba(176,107,255,.5); }
+#lie-modal {
+  position: fixed; inset: 0; z-index: 22;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10,4,16,.82); backdrop-filter: blur(4px); padding: 16px;
+}
+.lie-card {
+  position: relative;
+  background: linear-gradient(180deg, #1c1030, #100818);
+  border: 2px solid #5a3a8a; border-radius: 18px;
+  padding: 22px; max-width: 520px; width: 100%;
+  max-height: 92vh; overflow-y: auto;
+  box-shadow: 0 0 46px -8px rgba(150,90,230,.5), 0 20px 60px rgba(0,0,0,.6);
+  animation: pop .25s ease;
+}
+.lie-card h2 { font-family: Georgia, serif; color: #d0a0ff; font-size: 21px; margin-bottom: 8px; }
+.lie-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+.lie-sub b { color: #e7d3ff; }
+.lie-verdict { padding: 8px 12px; border-radius: 10px; font-size: 12.5px; margin-bottom: 10px; }
+.lie-verdict.ok { background: rgba(120,220,120,.12); border: 1px solid rgba(120,220,120,.5); color: #b7f0b7; }
+.lie-verdict.ko { background: rgba(230,80,80,.12); border: 1px solid rgba(230,80,80,.5); color: #ffb0b0; }
+.lie-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.lf { font-size: 11.5px; padding: 3px 8px; border-radius: 8px; border: 1px solid var(--border); }
+.lf.ok { color: #b7f0b7; border-color: rgba(120,220,120,.5); }
+.lf.ko { color: #ffb0b0; border-color: rgba(230,80,80,.5); }
+.lie-pact {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: rgba(30,16,44,.7); border: 1px solid #4a2c6a; border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 12px;
+}
+.lp-info { font-size: 12.5px; color: #e7d3ff; }
+.lp-info small { color: var(--muted); }
+.lie-pact button {
+  padding: 7px 11px; border-radius: 8px; border: none; cursor: pointer;
+  font-weight: bold; font-size: 12px; color: #150a1e;
+  background: linear-gradient(180deg, #c79bff, #8a4ad0); white-space: nowrap;
+}
+.lie-pact button:disabled { filter: grayscale(.6) brightness(.7); cursor: default; opacity: .8; }
+.lie-active {
+  background: rgba(176,107,255,.12); border: 1px solid rgba(176,107,255,.5);
+  border-radius: 10px; padding: 12px; font-size: 13px; color: #e7d3ff; line-height: 1.5; text-align: center;
+}
+.lie-active b { color: #fff; }
+.lie-note { font-size: 12.5px; color: var(--muted); text-align: center; padding: 10px; }
+.lie-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 6px; }
+.lie-targets { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.lie-tgt {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: rgba(30,16,44,.6); border: 1px solid #3a2450; border-radius: 10px;
+  padding: 8px; cursor: pointer; color: #e7d3ff;
+}
+.lie-tgt.on { border-color: #b06bff; box-shadow: 0 0 10px rgba(176,107,255,.4); }
+.lt-name { font-size: 12px; font-weight: bold; }
+.lt-val { font-size: 11px; color: var(--holy); font-variant-numeric: tabular-nums; }
+.lie-factor { display: flex; align-items: center; gap: 12px; justify-content: center; }
+.lie-factor button {
+  width: 38px; height: 38px; border-radius: 50%; border: 2px solid #5a3a8a;
+  background: rgba(30,16,44,.8); color: #e7d3ff; font-size: 22px; cursor: pointer; line-height: 1;
+}
+.lf-val { font-size: 22px; font-weight: bold; color: #d0a0ff; min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.lf-range { font-size: 10.5px; color: var(--muted); }
+.lie-preview { text-align: center; margin: 12px 0; font-size: 13px; color: #e7d3ff; }
+.lie-preview b { color: var(--holy); }
+.lie-preview small { color: var(--muted); }
+.lie-compose #do-lie { width: 100%; background: linear-gradient(180deg, #b06bff, #7a2ec0); }

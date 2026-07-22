@@ -66,6 +66,13 @@ class UI {
       if (e.target.id === 'prestige-modal') this.closePrestige();
     });
 
+    // --- Mensonges de Belial ---
+    this.$('lie-btn').addEventListener('click', () => this.openLie());
+    this.$('lie-close').addEventListener('click', () => this.closeLie());
+    this.$('lie-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'lie-modal') this.closeLie();
+    });
+
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
@@ -270,6 +277,30 @@ class UI {
       rb.innerHTML = `<p class="prestige-locked">🔒 Vaincs les 7 Vertus (<b>${c}/${VIRTUES.length}</b>) pour pouvoir renaître.</p>`;
     }
 
+    // Incarnation d'un démon primordial (après ≥1 prestige).
+    const inc = this.$('prestige-incarnation');
+    if (g.canIncarnate()) {
+      const cards = INCARNATIONS.map((d) => {
+        const chosen = g.incarnation === d.id;
+        const lockable = !d.available;
+        return `<div class="inc-item ${chosen ? 'chosen' : ''} ${lockable ? 'locked' : ''}" style="--inc:${d.color}">
+          <div class="inc-emoji">${d.emoji}</div>
+          <div class="inc-name">${d.name}</div>
+          <div class="inc-title">${d.title}</div>
+          <button class="inc-btn" data-id="${d.id}" ${(!d.available || chosen) ? 'disabled' : ''}>
+            ${chosen ? '✓ Incarné' : (d.available ? 'Incarner' : '🔒 À venir')}</button>
+        </div>`;
+      }).join('');
+      inc.innerHTML = `<h3 class="inc-head">👺 Incarner un Démon Primordial</h3>
+        <div class="inc-grid">${cards}</div>`;
+      inc.querySelectorAll('.inc-btn').forEach((b) => b.addEventListener('click', () => {
+        if (g.setIncarnation(b.dataset.id)) { this.renderPrestige(); this.refresh(); }
+      }));
+      inc.style.display = '';
+    } else {
+      inc.innerHTML = ''; inc.style.display = 'none';
+    }
+
     // Les 7 améliorations permanentes.
     const grid = this.$('prestige-grid');
     grid.innerHTML = '';
@@ -308,6 +339,125 @@ class UI {
     this.refresh();
     this.showStartScreen();                 // progression remise à zéro → accueil
     this.$('prestige-modal').classList.remove('hidden'); // on garde la boutique ouverte
+  }
+
+  /* ---------------------- Mensonges de Belial ---------------------- */
+  openLie() {
+    const g = this.game;
+    // Sélection par défaut du composeur de mensonge.
+    if (!this._lieTarget) this._lieTarget = LIE_TARGETS[0].id;
+    this._lieFactor = Math.max(LIE_MIN, Math.min(g.maxLieFactor(), this._lieFactor || LIE_MIN));
+    this.renderLie();
+    this.$('lie-modal').classList.remove('hidden');
+  }
+  closeLie() { this.$('lie-modal').classList.add('hidden'); }
+
+  fmtLie(targetId, v) {
+    const def = LIE_TARGETS.find((t) => t.id === targetId);
+    return def ? def.fmt(v) : Math.round(v);
+  }
+
+  renderLie() {
+    const g = this.game;
+    const body = this.$('lie-body');
+    const maxF = g.maxLieFactor();
+
+    // Verdict du dernier mensonge résolu.
+    let verdict = '';
+    if (g.lastLieResult) {
+      const r = g.lastLieResult;
+      const tn = (LIE_TARGETS.find((t) => t.id === r.target) || {}).name || r.target;
+      verdict = r.success
+        ? `<div class="lie-verdict ok">✅ Mensonge tenu sur « ${tn} » : +1 point de prestige à la prochaine renaissance.</div>`
+        : `<div class="lie-verdict ko">❌ Mensonge démasqué sur « ${tn} » : tu en subis le prix.</div>`;
+    }
+
+    // État courant (dette / malus / bonus en attente).
+    const flags = [];
+    if (g.pendingPrestigeBonus > 0) flags.push(`<span class="lf ok">✨ +${g.pendingPrestigeBonus} prestige en attente</span>`);
+    if (g.soulDebt > 0) flags.push(`<span class="lf ko">💸 Dette : ${this.fmt(Math.round(g.soulDebt))} âmes</span>`);
+    if (g.lieMalus) {
+      const tn = (LIE_TARGETS.find((t) => t.id === g.lieMalus.target) || {}).name || g.lieMalus.target;
+      flags.push(`<span class="lf ko">⛓️ Malus : ${tn} ÷${g.lieMalus.factor}</span>`);
+    }
+    const flagsHtml = flags.length ? `<div class="lie-flags">${flags.join('')}</div>` : '';
+
+    // Pacte Mensonges (achetable avec des âmes).
+    const mDef = UPGRADES.find((u) => u.id === 'mensonges');
+    const mLvl = g.upgradeLevel('mensonges');
+    const mCost = g.upgradeCost(mDef);
+    const mMax = mLvl >= mDef.max;
+    const mAfford = !mMax && g.souls >= mCost;
+    const mensonges = `<div class="lie-pact">
+      <div class="lp-info"><b>🎭 ${mDef.name}</b> · Niv. ${mLvl} <small>(${mDef.effect(mLvl)})</small></div>
+      <button id="buy-mensonges" ${mAfford ? '' : 'disabled'}>${mMax ? '✓ MAX' : `Améliorer · 💀 ${this.fmt(mCost)}`}</button>
+    </div>`;
+
+    // Mensonge déjà actif ?
+    if (g.lie) {
+      const L = g.lie;
+      const tn = (LIE_TARGETS.find((t) => t.id === L.target) || {}).name || L.target;
+      body.innerHTML = verdict + flagsHtml + mensonges +
+        `<div class="lie-active">🎭 Mensonge actif : <b>${tn} ×${L.factor}</b><br>
+         Rends-le vrai (atteins <b>${this.fmtLie(L.target, L.claimed)}</b>) avant la prochaine Vertu.</div>`;
+      this.bindMensongesBtn();
+      return;
+    }
+
+    // Impossible de mentir en plein combat.
+    if (this.game.phase === 'playing') {
+      body.innerHTML = verdict + flagsHtml + mensonges +
+        `<p class="lie-note">🗡️ Impossible de mentir en plein chaos. Reviens hors combat pour tromper le jeu.</p>`;
+      this.bindMensongesBtn();
+      return;
+    }
+
+    // Composeur de mensonge.
+    const targets = LIE_TARGETS.map((t) => {
+      const cur = g.lieBaseValue(t.id);
+      return `<button class="lie-tgt ${this._lieTarget === t.id ? 'on' : ''}" data-id="${t.id}">
+        <span class="lt-name">${t.name}</span><span class="lt-val">${this.fmtLie(t.id, cur)}</span></button>`;
+    }).join('');
+
+    const f = this._lieFactor;
+    const base = g.lieBaseValue(this._lieTarget);
+    const claimed = this._lieTarget === 'souls' ? Math.floor(base * f) : base * f;
+    body.innerHTML = verdict + flagsHtml + mensonges +
+      `<div class="lie-compose">
+        <div class="lie-label">Sur quoi mentir ?</div>
+        <div class="lie-targets">${targets}</div>
+        <div class="lie-label">Ampleur du mensonge</div>
+        <div class="lie-factor">
+          <button id="lf-minus">−</button>
+          <div class="lf-val">×${f.toFixed(1)}</div>
+          <button id="lf-plus">+</button>
+          <div class="lf-range">min ×${LIE_MIN} · max ×${maxF}</div>
+        </div>
+        <div class="lie-preview">Valeur affichée : <b>${this.fmtLie(this._lieTarget, claimed)}</b>
+          <small>(réelle : ${this.fmtLie(this._lieTarget, base)})</small></div>
+        <button id="do-lie" class="big-btn">🎭 Mentir</button>
+      </div>`;
+
+    this.bindMensongesBtn();
+    body.querySelectorAll('.lie-tgt').forEach((b) => b.addEventListener('click', () => {
+      this._lieTarget = b.dataset.id; this.renderLie();
+    }));
+    body.querySelector('#lf-minus').addEventListener('click', () => {
+      this._lieFactor = Math.max(LIE_MIN, +(this._lieFactor - 0.5).toFixed(1)); this.renderLie();
+    });
+    body.querySelector('#lf-plus').addEventListener('click', () => {
+      this._lieFactor = Math.min(maxF, +(this._lieFactor + 0.5).toFixed(1)); this.renderLie();
+    });
+    body.querySelector('#do-lie').addEventListener('click', () => {
+      if (g.activateLie(this._lieTarget, this._lieFactor)) { this.renderLie(); this.refresh(); }
+    });
+  }
+
+  bindMensongesBtn() {
+    const btn = this.$('buy-mensonges');
+    if (btn) btn.addEventListener('click', () => {
+      if (this.game.buyUpgrade('mensonges')) { this.renderLie(); this.refresh(); }
+    });
   }
 
   async copyExport() {
@@ -716,6 +866,7 @@ class UI {
     const badge = this.$('nav-shop-badge');
     let affordable = 0;
     for (const def of UPGRADES) {
+      if (def.special) continue; // pactes spéciaux (Mensonges) : hors arbre
       const n = g.upgradeLevel(def.id);
       if (g.isUnlocked(def.id) && n < def.max && g.souls >= g.upgradeCost(def)) affordable++;
     }
@@ -728,6 +879,12 @@ class UI {
     pbtn.classList.toggle('hidden', !(g.prestigeUnlocked() || g.prestigeCount > 0));
     pbtn.classList.toggle('ready', g.prestigeUnlocked());
     if (!this.$('prestige-modal').classList.contains('hidden')) this.renderPrestige();
+
+    // Bouton Mensonges (topbar) : visible en incarnant Belial.
+    const lbtn = this.$('lie-btn');
+    lbtn.classList.toggle('hidden', g.incarnation !== 'belial');
+    lbtn.classList.toggle('ready', g.incarnation === 'belial' && g.canLie());
+    if (!this.$('lie-modal').classList.contains('hidden')) this.renderLie();
 
     // Carte de l'autel (si déjà construite) + pastille de l'onglet Autel.
     this.refreshAltar();
