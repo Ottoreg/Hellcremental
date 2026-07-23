@@ -469,10 +469,11 @@ const UPGRADES = [
   // Pacte spécial de Belial (démon du Mensonge). Se débloque en incarnant Belial.
   {
     id: 'mensonges', name: 'Mensonges', emoji: '🎭', special: 'belial',
-    desc: 'Le souffle de Belial gonfle tes tromperies : augmente l\'ampleur ' +
-          'maximale de tes mensonges (facteur de multiplication).',
-    baseCost: 25000, mult: 1.5, max: 10,
-    effect: (n) => `Mensonge jusqu'à ×${5 + n}`,
+    desc: 'Le souffle de Belial récompense tes tromperies : chaque mensonge ' +
+          'tenu rapporte davantage de points de prestige. Un investissement ' +
+          'colossal, à financer sur plusieurs damnations.',
+    baseCost: 5000000, mult: 10, max: 2, // 5 M puis 50 M
+    effect: (n) => `Mensonge tenu : +${1 + n} pt${1 + n > 1 ? 's' : ''} de prestige`,
     apply: (s, n) => { s.lieBonus = n; },
   },
 ];
@@ -692,5 +693,11 @@ const LIE_TARGETS = [
   { id: 'souls',       name: 'Âmes',           stat: null,          fmt: (v) => Math.round(v) },
 ];
 
-const LIE_MIN = 1.5;      // multiplicateur minimum d'un mensonge
-const LIE_BASE_MAX = 5;   // multiplicateur maximum de base (avant pacte Mensonges)
+// Ampleur d'un mensonge, exprimée en pourcentage du montant actuel : de +50 %
+// (facteur ×1,5) à +100 % (facteur ×2,0), par paliers de 5 %.
+const LIE_PCT_MIN = 0.5;   // +50 %
+const LIE_PCT_MAX = 1.0;   // +100 %
+const LIE_PCT_STEP = 0.05; // pas de 5 %
+const LIE_MIN = 1 + LIE_PCT_MIN;  // facteur minimum (×1,5)
+const LIE_MAX = 1 + LIE_PCT_MAX;  // facteur maximum (×2,0)
+const LIE_STEP = LIE_PCT_STEP;    // pas du facteur (0,05)
