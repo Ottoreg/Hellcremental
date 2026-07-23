@@ -388,8 +388,20 @@ class UI {
             ${chosen ? '✓ Incarné' : (d.available ? 'Incarner' : '🔒 À venir')}</button>
         </div>`;
       }).join('');
+      // Note d'état de l'hyper-spécialisation (Astaroth).
+      let astaNote = '';
+      if (g.incarnation === 'astaroth') {
+        const hv = g.hyperVoie();
+        const vName = { voie_magie: 'Magie', voie_legion: 'Légions', voie_clic: 'Clic' }[hv];
+        astaNote = `<div class="inc-asta">👑 <b>Hyper-spécialisation active.</b> ` +
+          (hv
+            ? `Voie verrouillée : <b>${vName}</b>. Les pactes ultimes de cette voie sont disponibles.`
+            : `Choisis ta <b>voie unique</b> dans l'arbre des pactes : elle deviendra ta seule voie.`) +
+          (g.astarothRefund > 0 ? `<br>💰 Serment du Chaos banni : <b>${this.fmt(g.astarothRefund)}</b> âmes remboursées.` : '') +
+          `</div>`;
+      }
       inc.innerHTML = `<h3 class="inc-head">👺 Incarner un Démon Primordial</h3>
-        <div class="inc-grid">${cards}</div>`;
+        <div class="inc-grid">${cards}</div>${astaNote}`;
       inc.querySelectorAll('.inc-btn').forEach((b) => b.addEventListener('click', () => {
         if (g.setIncarnation(b.dataset.id)) { this.renderPrestige(); this.refresh(); }
       }));
