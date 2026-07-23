@@ -32,6 +32,7 @@ class Game {
     this.soulDebt = 0;         // dette d'âmes à rembourser (mensonge sur les âmes)
     this.pendingPrestigeBonus = 0; // points de prestige bonus (mensonges tenus)
     this.worldEndCyclePoints = 0;  // points de prestige gagnés en Fin du Monde ce cycle
+    this.incomeSamples = [];   // âmes récoltées sur les derniers niveaux (revenu moyen)
     this.lastLieResult = null; // dernier verdict de mensonge (feedback UI)
     this.totalDestroyed = 0;
     this.bestLevel = 1;
@@ -103,6 +104,7 @@ class Game {
       soulDebt: this.soulDebt,
       pendingPrestigeBonus: this.pendingPrestigeBonus,
       worldEndCyclePoints: this.worldEndCyclePoints,
+      incomeSamples: this.incomeSamples,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -171,6 +173,7 @@ class Game {
     this.soulDebt = d.soulDebt || 0;
     this.pendingPrestigeBonus = d.pendingPrestigeBonus || 0;
     this.worldEndCyclePoints = d.worldEndCyclePoints || 0;
+    this.incomeSamples = Array.isArray(d.incomeSamples) ? d.incomeSamples : [];
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.worldEnd = null; // une épreuve en cours ne survit pas à un rechargement
@@ -197,7 +200,7 @@ class Game {
     this.everBought = {}; this.prestigeHistory = []; this.cycleRavagesStart = 0;
     this.incarnation = null; this.lie = null; this.lieMalus = null;
     this.soulDebt = 0; this.pendingPrestigeBonus = 0; this.lastLieResult = null;
-    this.worldEndCyclePoints = 0;
+    this.worldEndCyclePoints = 0; this.incomeSamples = [];
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.worldEnd = null;
     this.pendingRun = null;
@@ -364,9 +367,19 @@ class Game {
   }
 
   /* ---------------------- Mensonge de Belial ---------------------- */
-  maxLieFactor() { return LIE_BASE_MAX + this.upgradeLevel('mensonges'); }
-  /* On ne peut mentir qu'en incarnant Belial, hors combat, et un seul à la fois. */
-  canLie() { return this.incarnation === 'belial' && this.phase !== 'playing' && !this.lie; }
+  /* Ampleur : facteur fixe de ×1,5 (+50 %) à ×2,0 (+100 %). */
+  minLieFactor() { return LIE_MIN; }
+  maxLieFactor() { return LIE_MAX; }
+  /* Points de prestige rapportés par un mensonge tenu : 1 de base + le niveau
+   * du pacte « Mensonges » (0 → +1, palier 1 → +2, palier 2 → +3). */
+  lieReward() { return 1 + this.upgradeLevel('mensonges'); }
+  /* On ne peut mentir qu'en incarnant Belial, hors combat, un seul à la fois,
+   * et tant que les 7 Vertus ne sont pas toutes tombées (sinon plus de Vertu
+   * pour trancher le mensonge : il faut renaître). */
+  canLie() {
+    return this.incarnation === 'belial' && this.phase !== 'playing'
+      && !this.lie && !this.allVirtuesDefeated();
+  }
 
   /* Valeur courante d'une cible de mensonge (statistique ou âmes), sans mensonge. */
   lieBaseValue(targetId) {
@@ -417,6 +430,66 @@ class Game {
     return { frac, real, claimed: L.claimed, done: Math.max(0, done), needed, target: L.target };
   }
 
+  /* Gain d'âmes moyen par niveau (moyenne glissante des derniers nettoyages). */
+  avgSoulsPerLevel() {
+    const s = this.incomeSamples;
+    if (s && s.length) return Math.max(1, Math.round(s.reduce((a, x) => a + x, 0) / s.length));
+    // Repli si aucun échantillon : estimation grossière basée sur le niveau.
+    const mult = (this.stats && this.stats.soulMult) || 1;
+    return Math.max(1, Math.round(60 * this.level * mult));
+  }
+
+  /* Niveaux restants avant la prochaine Vertu (boss de dizaine). */
+  levelsToNextVirtue() {
+    const m = this.level % 10;
+    return m === 0 ? 10 : (10 - m);
+  }
+
+  /* Estime le coût (en âmes) pour rendre vrai un mensonge de `factor` sur
+   * `targetId`, et le nombre de niveaux que cela représente au rythme actuel.
+   * - Âmes : coût exact = montant actuel × (facteur − 1).
+   * - Stat : achat glouton « boîte noire » des pactes les plus rentables pour
+   *   monter la stat réelle jusqu'à la cible (s'adapte aux pactes déjà pris). */
+  estimateLieCost(targetId, factor) {
+    let costSouls, reachable = true;
+    if (targetId === 'souls') {
+      costSouls = Math.max(0, Math.floor(this.souls * (factor - 1)));
+    } else {
+      const backupUp = JSON.parse(JSON.stringify(this.upgrades));
+      const backupTime = this.timeLeft;
+      this.computeStats(false);
+      const goal = (this.stats[targetId] || 0) * factor;
+      let cost = 0, guard = 0;
+      while ((this.stats[targetId] || 0) < goal && guard++ < 150) {
+        let best = null;
+        for (const def of UPGRADES) {
+          if (def.special) continue;
+          const n = this.upgrades[def.id] || 0;
+          if (def.max && n >= def.max) continue;
+          if (!this.isUnlocked(def.id)) continue;
+          const before = this.stats[targetId] || 0;
+          const c = def.baseCost * Math.pow(def.mult, n);
+          this.upgrades[def.id] = n + 1; this.computeStats(false);
+          const delta = (this.stats[targetId] || 0) - before;
+          this.upgrades[def.id] = n; this.computeStats(false);
+          if (delta > 1e-9) {
+            const ratio = c / delta;
+            if (!best || ratio < best.ratio) best = { id: def.id, ratio, cost: c };
+          }
+        }
+        if (!best) { reachable = false; break; }
+        this.upgrades[best.id] = (this.upgrades[best.id] || 0) + 1;
+        cost += best.cost; this.computeStats(false);
+      }
+      if (guard >= 150) reachable = false; // trop loin : on borne l'estimation
+      costSouls = reachable ? Math.round(cost) : Infinity;
+      this.upgrades = backupUp; this.timeLeft = backupTime; this.computeStats(false);
+    }
+    const income = this.avgSoulsPerLevel();
+    const levels = (costSouls === Infinity) ? Infinity : Math.max(0, Math.ceil(costSouls / income));
+    return { costSouls, levels, income, toVirtue: this.levelsToNextVirtue(), target: targetId };
+  }
+
   /* Résout le mensonge en cours au moment où une Vertu est vaincue. */
   resolveLieOnVirtue() {
     // Fin d'un éventuel cycle de pénalité précédent.
@@ -434,8 +507,9 @@ class Game {
       success = realBase >= L.claimed;
       if (!success) this.lieMalus = { target: L.target, factor: L.factor };
     }
-    if (success) this.pendingPrestigeBonus += 1;
-    this.lastLieResult = { success, target: L.target, claimed: L.claimed };
+    const reward = this.lieReward(); // 1 + niveau du pacte « Mensonges »
+    if (success) this.pendingPrestigeBonus += reward;
+    this.lastLieResult = { success, target: L.target, claimed: L.claimed, reward };
     this.lie = null;
     this.computeStats(false);
   }
@@ -1460,6 +1534,10 @@ class Game {
       const bonus = Math.round(this.runSouls * 0.5 + this.level * 5);
       this.souls += bonus;
       result.bonus = bonus;
+      // Échantillon de revenu (récolte + bonus) pour estimer le coût d'un
+      // mensonge en nombre de niveaux. On ne garde que les 5 derniers.
+      this.incomeSamples.push(this.runSouls + bonus);
+      if (this.incomeSamples.length > 5) this.incomeSamples.shift();
       this.level++;
       this.bestLevel = Math.max(this.bestLevel, this.level);
       this.phase = 'cleared';

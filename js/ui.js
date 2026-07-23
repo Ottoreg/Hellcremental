@@ -389,18 +389,30 @@ class UI {
     return def ? def.fmt(v) : Math.round(v);
   }
 
+  /* Estimation mémoïsée du coût d'un mensonge (évite de relancer le calcul
+   * glouton à chaque re-rendu si rien n'a changé). */
+  _lieEstimate(target, factor) {
+    const g = this.game;
+    const key = target + '|' + factor.toFixed(2) + '|' + g.souls + '|' + JSON.stringify(g.upgrades);
+    if (this._lieEstKey !== key) {
+      this._lieEstKey = key;
+      this._lieEstVal = g.estimateLieCost(target, factor);
+    }
+    return this._lieEstVal;
+  }
+
   renderLie() {
     const g = this.game;
     const body = this.$('lie-body');
-    const maxF = g.maxLieFactor();
 
     // Verdict du dernier mensonge résolu.
     let verdict = '';
     if (g.lastLieResult) {
       const r = g.lastLieResult;
       const tn = (LIE_TARGETS.find((t) => t.id === r.target) || {}).name || r.target;
+      const rw = r.reward || 1;
       verdict = r.success
-        ? `<div class="lie-verdict ok">✅ Mensonge tenu sur « ${tn} » : +1 point de prestige à la prochaine renaissance.</div>`
+        ? `<div class="lie-verdict ok">✅ Mensonge tenu sur « ${tn} » : +${rw} point${rw > 1 ? 's' : ''} de prestige à la prochaine renaissance.</div>`
         : `<div class="lie-verdict ko">❌ Mensonge démasqué sur « ${tn} » : tu en subis le prix.</div>`;
     }
 
@@ -436,8 +448,9 @@ class UI {
         <div class="lp-txt"><b>${this.fmtLie(L.target, pr.real)}</b> / ${this.fmtLie(L.target, pr.claimed)}
           <span class="lp-pct ${pr.frac >= 1 ? 'done' : ''}">${pr.frac >= 1 ? '✓ rendu vrai' : pct + '%'}</span></div>
       </div>`;
+      const pctAmp = Math.round((L.factor - 1) * 100);
       body.innerHTML = verdict + flagsHtml + mensonges +
-        `<div class="lie-active">🎭 Mensonge actif : <b>${tn} ×${L.factor}</b><br>
+        `<div class="lie-active">🎭 Mensonge actif : <b>${tn} +${pctAmp} %</b><br>
          Rends-le vrai (atteins <b>${this.fmtLie(L.target, L.claimed)}</b>) avant la prochaine Vertu.</div>` +
         bar;
       this.bindMensongesBtn();
@@ -452,6 +465,15 @@ class UI {
       return;
     }
 
+    // Les 7 Vertus sont tombées : plus de Vertu pour trancher un mensonge, il
+    // faut renaître avant de pouvoir mentir à nouveau.
+    if (g.allVirtuesDefeated()) {
+      body.innerHTML = verdict + flagsHtml + mensonges +
+        `<p class="lie-note">⚜️ Les 7 Vertus sont anéanties : aucune ne peut plus démasquer un mensonge. Renais (Prestige) pour tromper de nouveau le monde.</p>`;
+      this.bindMensongesBtn();
+      return;
+    }
+
     // Composeur de mensonge.
     const targets = LIE_TARGETS.map((t) => {
       const cur = g.lieBaseValue(t.id);
@@ -460,8 +482,29 @@ class UI {
     }).join('');
 
     const f = this._lieFactor;
+    const ampPct = Math.round((f - 1) * 100);
     const base = g.lieBaseValue(this._lieTarget);
     const claimed = this._lieTarget === 'souls' ? Math.floor(base * f) : base * f;
+    const tName = (LIE_TARGETS.find((t) => t.id === this._lieTarget) || {}).name || this._lieTarget;
+
+    // Avertissement : coût d'accomplissement + niveaux estimés + prix de l'échec.
+    const est = this._lieEstimate(this._lieTarget, f);
+    const risky = (est.levels === Infinity) || (est.levels > est.toVirtue);
+    const lvlTxt = (est.levels === Infinity) ? '∞' : est.levels;
+    const costTxt = (est.costSouls === Infinity)
+      ? 'hors de portée avec tes pactes actuels'
+      : (this._lieTarget === 'souls'
+        ? `${this.fmt(est.costSouls)} âmes à récolter`
+        : `≈ ${this.fmt(est.costSouls)} âmes de pactes à monter`);
+    const failTxt = (this._lieTarget === 'souls')
+      ? `échec → dette jusqu'à ${this.fmt(est.costSouls === Infinity ? Math.floor(base * (f - 1)) : est.costSouls)} âmes (prélevée sur tes gains)`
+      : `échec → ${tName} ÷${f.toFixed(2)} au cycle suivant`;
+    const warn = `<div class="lie-warn ${risky ? 'risky' : ''}">
+      <div class="lw-line">🎯 ${costTxt}</div>
+      <div class="lw-line">⏱️ ≈ <b>${lvlTxt} niveau${(lvlTxt !== '∞' && lvlTxt > 1) ? 'x' : ''}</b> au rythme actuel · prochaine Vertu dans <b>${est.toVirtue}</b></div>
+      <div class="lw-fail">⚠️ ${failTxt}</div>
+    </div>`;
+
     body.innerHTML = verdict + flagsHtml + mensonges +
       `<div class="lie-compose">
         <div class="lie-label">Sur quoi mentir ?</div>
@@ -469,12 +512,14 @@ class UI {
         <div class="lie-label">Ampleur du mensonge</div>
         <div class="lie-factor">
           <button id="lf-minus">−</button>
-          <div class="lf-val">×${f.toFixed(1)}</div>
+          <div class="lf-val">+${ampPct} %</div>
           <button id="lf-plus">+</button>
-          <div class="lf-range">min ×${LIE_MIN} · max ×${maxF}</div>
+          <div class="lf-range">min +${Math.round(LIE_PCT_MIN * 100)} % · max +${Math.round(LIE_PCT_MAX * 100)} %</div>
         </div>
         <div class="lie-preview">Valeur affichée : <b>${this.fmtLie(this._lieTarget, claimed)}</b>
           <small>(réelle : ${this.fmtLie(this._lieTarget, base)})</small></div>
+        ${warn}
+        <div class="lie-reward">Tenu → <b>+${g.lieReward()} pt</b> de prestige</div>
         <button id="do-lie" class="big-btn">🎭 Mentir</button>
       </div>`;
 
@@ -483,10 +528,10 @@ class UI {
       this._lieTarget = b.dataset.id; this.renderLie();
     }));
     body.querySelector('#lf-minus').addEventListener('click', () => {
-      this._lieFactor = Math.max(LIE_MIN, +(this._lieFactor - 0.5).toFixed(1)); this.renderLie();
+      this._lieFactor = Math.max(LIE_MIN, +(this._lieFactor - LIE_STEP).toFixed(2)); this.renderLie();
     });
     body.querySelector('#lf-plus').addEventListener('click', () => {
-      this._lieFactor = Math.min(maxF, +(this._lieFactor + 0.5).toFixed(1)); this.renderLie();
+      this._lieFactor = Math.min(LIE_MAX, +(this._lieFactor + LIE_STEP).toFixed(2)); this.renderLie();
     });
     body.querySelector('#do-lie').addEventListener('click', () => {
       if (g.activateLie(this._lieTarget, this._lieFactor)) { this.renderLie(); this.refresh(); }
