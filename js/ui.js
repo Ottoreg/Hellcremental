@@ -723,6 +723,15 @@ class UI {
     for (const def of UPGRADES) {
       const el = this.$('tree-world').querySelector(`.tree-node[data-id="${def.id}"]`);
       if (!el) continue;
+      // Pactes hyper-spécialisés : visibles seulement en incarnant Astaroth.
+      const node = SKILL_TREE.find((nd) => nd.id === def.id);
+      if (node && node.hyper) {
+        const show = g.incarnation === 'astaroth';
+        el.style.display = show ? '' : 'none';
+        this.$('tree-links').querySelectorAll(`line[data-id="${def.id}"]`)
+          .forEach((line) => { line.style.display = show ? '' : 'none'; });
+        if (!show) continue;
+      }
       const n = g.upgradeLevel(def.id);
       const maxed = n >= def.max;
       const cost = g.upgradeCost(def);
