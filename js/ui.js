@@ -80,6 +80,13 @@ class UI {
       if (e.target.id === 'lie-modal') this.closeLie();
     });
 
+    // --- Statistiques cumulées ---
+    this.$('stats-btn').addEventListener('click', () => this.openStats());
+    this.$('stats-close').addEventListener('click', () => this.closeStats());
+    this.$('stats-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'stats-modal') this.closeStats();
+    });
+
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
@@ -286,6 +293,64 @@ class UI {
       `<div class="ps-list">${rows}</div>`;
   }
   closeMenu() { this.$('menu').classList.add('hidden'); }
+
+  /* ---------------------- Statistiques cumulées (📊) ---------------------- */
+  openStats() { this.renderStats(); this.$('stats-modal').classList.remove('hidden'); }
+  closeStats() { this.$('stats-modal').classList.add('hidden'); }
+
+  /* Formate une valeur de stat selon son type. */
+  fmtStatVal(type, v) {
+    switch (type) {
+      case 'pct': return (v >= 0 ? '+' : '') + Math.round(v * 100) + ' %';
+      case 'mult': return '×' + v.toFixed(2);
+      case 'sec': return v.toFixed(2) + ' s';
+      case 'dec': return v.toFixed(1);
+      default: return this.fmt(Math.round(v));
+    }
+  }
+  /* Formate une contribution (delta) d'une source pour une stat. */
+  fmtStatDelta(type, d) {
+    const sign = d >= 0 ? '+' : '−';
+    const a = Math.abs(d);
+    switch (type) {
+      case 'pct': return sign + Math.round(a * 100) + ' %';
+      case 'mult': return sign + a.toFixed(2);
+      case 'sec': return sign + a.toFixed(2) + ' s';
+      case 'dec': return sign + a.toFixed(1);
+      default: return sign + this.fmt(Math.round(a));
+    }
+  }
+
+  renderStats() {
+    const g = this.game;
+    const bd = g.statsBreakdown();
+    const body = this.$('stats-body');
+    let html = '';
+    let curGroup = null;
+    for (const row of STAT_ROWS) {
+      const val = bd.stats[row.key] || 0;
+      if (row.hideIfZero && Math.abs(val) < 1e-9) continue;
+      if (row.group !== curGroup) {
+        curGroup = row.group;
+        html += `<div class="stat-group">${curGroup}</div>`;
+      }
+      const contribs = bd.contribs[row.key] || [];
+      const detail = contribs.length
+        ? contribs.map((c) => `<div class="sd-line"><span>${c.emoji} ${c.label}</span><b>${this.fmtStatDelta(row.type, c.delta)}</b></div>`).join('')
+        : `<div class="sd-line"><span>Aucun bonus</span></div>`;
+      html += `<div class="stat-row" tabindex="0">
+        <div class="sr-head">
+          <span class="sr-label">${row.label}</span>
+          <span class="sr-val">${this.fmtStatVal(row.type, val)}</span>
+        </div>
+        <div class="stat-detail">${detail}</div>
+      </div>`;
+    }
+    body.innerHTML = html;
+    // Tap/clic pour déplier (le survol déplie aussi via CSS sur PC).
+    body.querySelectorAll('.stat-row').forEach((r) =>
+      r.addEventListener('click', () => r.classList.toggle('open')));
+  }
 
   /* ---------------------- Boutique Démoniaque (Prestige) ---------------------- */
   openPrestige() { this.renderPrestige(); this.$('prestige-modal').classList.remove('hidden'); }

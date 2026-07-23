@@ -701,3 +701,30 @@ const LIE_PCT_STEP = 0.05; // pas de 5 %
 const LIE_MIN = 1 + LIE_PCT_MIN;  // facteur minimum (×1,5)
 const LIE_MAX = 1 + LIE_PCT_MAX;  // facteur maximum (×2,0)
 const LIE_STEP = LIE_PCT_STEP;    // pas du facteur (0,05)
+
+/* Panneau des statistiques cumulées (bouton 📊). Chaque ligne cible une clé de
+ * l'objet `stats` ; `type` gouverne le formatage de la valeur ET des
+ * contributions détaillées (au survol). `hideIfZero` masque les lignes de
+ * serviteurs/pouvoirs non pertinents. */
+const STAT_ROWS = [
+  { group: 'Démon', key: 'damage',         label: 'Dégâts',              type: 'int' },
+  { group: 'Démon', key: 'clickDamage',    label: 'Dégâts de clic',      type: 'int' },
+  { group: 'Démon', key: 'moveSpeed',      label: 'Vitesse de déplacement', type: 'dec' },
+  { group: 'Démon', key: 'attackInterval', label: "Délai d'attaque",     type: 'sec', lowerBetter: true },
+  { group: 'Démon', key: 'lifespan',       label: 'Longévité',           type: 'sec' },
+  { group: 'Démon', key: 'splash',         label: 'Dégâts de zone',      type: 'pct' },
+  { group: 'Démon', key: 'soulMult',       label: "Récolte d'âmes",      type: 'mult' },
+
+  { group: 'Serviteurs & Pouvoirs', key: 'minions',       label: 'Esprits serviteurs',  type: 'int', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'minionDmgBonus',label: 'Dégâts serviteurs',   type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'minionSpeed',   label: 'Vitesse serviteurs',  type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'demoDmgBonus',  label: 'Dégâts du Colosse',   type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'demoSpeed',     label: 'Vitesse du Colosse',  type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'vagabond',      label: 'Vagabonds',           type: 'int', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'vagabondDmg',   label: 'Dégâts de peste',     type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'stormling',     label: 'Foudroyeurs',         type: 'int', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'stormlingDmg',  label: 'Dégâts des éclairs',  type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'servantDmg',    label: 'Dégâts serviteurs (global)', type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'powerDmg',      label: 'Dégâts des pouvoirs', type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'foudreDmg',     label: 'Dégâts de la Foudre', type: 'pct', hideIfZero: true },
+];

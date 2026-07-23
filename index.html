@@ -61,6 +61,7 @@
         <button id="lie-btn" class="icon-btn hidden" title="Mensonges de Belial">🎭</button>
         <button id="cheat-btn" class="icon-btn" title="+1 milliard d'âmes (test)">💰</button>
         <button id="skip-btn" class="icon-btn" title="Passer 10 niveaux (test) — atteins le Prestige plus vite">⏭️</button>
+        <button id="stats-btn" class="icon-btn" title="Statistiques cumulées">📊</button>
         <button id="menu-btn" class="icon-btn" title="Options">⚙️</button>
       </div>
     </header>
@@ -256,6 +257,16 @@
            Rends ton mensonge <b>vrai</b> pour un point de prestige bonus — sinon,
            tu paies le prix.</p>
         <div id="lie-body"></div>
+      </div>
+    </div>
+
+    <!-- Statistiques cumulées : valeurs + provenance de chaque boost (survol) -->
+    <div id="stats-modal" class="hidden">
+      <div class="stats-card">
+        <button id="stats-close" class="menu-close" title="Fermer">✕</button>
+        <h2>📊 Statistiques cumulées</h2>
+        <p class="stats-sub">Survole (ou touche) une statistique pour voir d'où vient chaque boost.</p>
+        <div id="stats-body"></div>
       </div>
     </div>
 
