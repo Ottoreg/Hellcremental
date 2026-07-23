@@ -271,10 +271,15 @@ class UI {
     if (!g.prestigeCount) { sec.hidden = true; return; }
     sec.hidden = false;
     const totalPts = g.prestigeHistory.reduce((t, p) => t + (p.points || 0), 0);
-    const rows = g.prestigeHistory.slice().reverse().map((p) =>
-      `<div class="ps-row"><span class="ps-n">Prestige ${p.n}</span>` +
-      `<span class="ps-detail">🔥 ${this.fmt(p.ravages || 0)} ravages · niv. ${p.niveau || '?'} · +${p.points || 0} pts</span></div>`
-    ).join('');
+    const rows = g.prestigeHistory.slice().reverse().map((p) => {
+      // Détail des points : Fin du Monde et mensonges tenus, si présents.
+      const extras = [];
+      if (p.worldEnd > 0) extras.push(`🌍 ${p.worldEnd}`);
+      if (p.bonus > 0) extras.push(`🎭 ${p.bonus}`);
+      const detail = extras.length ? ` <small>(${extras.join(' · ')})</small>` : '';
+      return `<div class="ps-row"><span class="ps-n">Prestige ${p.n}</span>` +
+        `<span class="ps-detail">🔥 ${this.fmt(p.ravages || 0)} ravages · niv. ${p.niveau || '?'} · +${p.points || 0} pts${detail}</span></div>`;
+    }).join('');
     this.$('prestige-stats').innerHTML =
       `<p class="ps-summary"><b>${g.prestigeCount}</b> prestige${g.prestigeCount > 1 ? 's' : ''} · ` +
       `<b>${totalPts}</b> points gagnés · <b>${g.prestigePoints}</b> à dépenser</p>` +
@@ -877,6 +882,10 @@ class UI {
       const we = g.worldEnd;
       this.$('hud-worldend').classList.toggle('hidden', !we);
       if (we) this.$('worldend-text').textContent = `Vertu ${we.stage}/${we.total}`;
+      // Dette d'âmes (mensonge de Belial non tenu) : prélevée sur chaque gain.
+      const debt = g.soulDebt || 0;
+      this.$('hud-debt').classList.toggle('hidden', debt <= 0);
+      if (debt > 0) this.$('debt-text').textContent = 'dette ' + this.fmt(Math.round(debt));
       // Le compte à rebours s'affole dans les 5 dernières secondes.
       this.$('hud').classList.toggle('low', g.timeLeft <= 5);
       // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
@@ -891,6 +900,7 @@ class UI {
       this.$('hud-drain').classList.add('hidden');
       this.$('hud-respawn').classList.add('hidden');
       this.$('hud-worldend').classList.add('hidden');
+      this.$('hud-debt').classList.add('hidden');
     }
 
     // Fiche de pacte ouverte : on la garde à jour (coût/abordable).
