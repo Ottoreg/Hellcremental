@@ -586,9 +586,9 @@ class Game {
     return true;
   }
 
-  /* Calcule les stats du démon à partir des pouvoirs achetés. */
-  computeStats(resetLifespan = true) {
-    const s = {
+  /* Objet de statistiques « à zéro » (valeurs de base avant tout pacte). */
+  _baseStats() {
+    return {
       damage: CONFIG.BASE_DAMAGE,
       attackInterval: CONFIG.BASE_ATTACK_INTERVAL,
       moveSpeed: CONFIG.BASE_MOVE_SPEED,
@@ -605,6 +605,39 @@ class Game {
       foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
       powerDmg: 0, servantDmg: 0, lieBonus: 0,
     };
+  }
+
+  /* Décompose chaque statistique par source (Base, pactes, démons, prestige,
+   * Serment, mensonge…) pour le panneau 📊. Rejoue le même empilement que
+   * computeStats en relevant le delta de chaque source (méthode « boîte noire »,
+   * sans effet de bord sur l'état du jeu). Renvoie { stats, contribs }. */
+  statsBreakdown() {
+    const s = this._baseStats();
+    const keys = Object.keys(s).filter((k) => typeof s[k] === 'number');
+    const contribs = {};
+    for (const k of keys) if (Math.abs(s[k]) > 1e-9) (contribs[k] = contribs[k] || []).push({ label: 'Base', emoji: '▪️', delta: s[k] });
+    const src = (label, emoji, fn) => {
+      const before = {}; for (const k of keys) before[k] = s[k];
+      fn();
+      for (const k of keys) {
+        const d = s[k] - before[k];
+        if (Math.abs(d) > 1e-9) (contribs[k] = contribs[k] || []).push({ label, emoji, delta: d });
+      }
+    };
+    for (const def of UPGRADES) { const n = this.upgradeLevel(def.id); if (n > 0) src(def.name, def.emoji, () => def.apply(s, n)); }
+    for (const dmn of PRIMORDIAL_DEMONS) { if (this.demonUnlocked(dmn.id)) src(dmn.name, dmn.emoji || '👑', () => dmn.apply(s)); }
+    for (const pu of PRESTIGE_UPGRADES) { const pn = this.prestigeUpgradeLevel(pu.id); if (pn > 0) src(pu.name, pu.emoji || '🔻', () => pu.apply(s, pn)); }
+    if (this.upgradeLevel('pacte_libre') >= 1) src('Serment du Chaos', '⛓️', () => { s.lifespan *= 0.5; });
+    if (this.lie && this.lie.target !== 'souls' && typeof s[this.lie.target] === 'number')
+      src('Mensonge de Belial', '🎭', () => { s[this.lie.target] *= this.lie.factor; });
+    if (this.lieMalus && typeof s[this.lieMalus.target] === 'number')
+      src('Mensonge démasqué', '⛓️', () => { s[this.lieMalus.target] /= this.lieMalus.factor; });
+    return { stats: s, contribs };
+  }
+
+  /* Calcule les stats du démon à partir des pouvoirs achetés. */
+  computeStats(resetLifespan = true) {
+    const s = this._baseStats();
     for (const def of UPGRADES) {
       const n = this.upgradeLevel(def.id);
       if (n > 0) def.apply(s, n);
