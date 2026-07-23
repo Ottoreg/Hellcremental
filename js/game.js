@@ -722,7 +722,12 @@ class Game {
   generateLevel(level, opts = {}) {
     const biome = this.biomeFor(level);
     const pool = this.buildWeightedPool(biome.pool);
-    const hpMult = 1 + (level - 1) * 0.35;
+    let hpMult = 1 + (level - 1) * 0.35;
+    // Au-delà du niveau 70 (et donc aussi en Fin du Monde, générée à des
+    // niveaux effectifs > 70) : les PV sont nettement renforcés — ×2 au
+    // niveau 71, puis progressivement davantage — car le démon est devenu
+    // bien trop puissant pour une montée de PV linéaire.
+    if (level > 70) hpMult *= 2 + (level - 71) * 0.1;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
