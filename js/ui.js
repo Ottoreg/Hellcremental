@@ -429,9 +429,17 @@ class UI {
     if (g.lie) {
       const L = g.lie;
       const tn = (LIE_TARGETS.find((t) => t.id === L.target) || {}).name || L.target;
+      const pr = g.lieProgress();
+      const pct = Math.round(pr.frac * 100);
+      const bar = `<div class="lie-progress">
+        <div class="lp-track"><div class="lp-fill ${pr.frac >= 1 ? 'done' : ''}" style="width:${pct}%"></div></div>
+        <div class="lp-txt"><b>${this.fmtLie(L.target, pr.real)}</b> / ${this.fmtLie(L.target, pr.claimed)}
+          <span class="lp-pct ${pr.frac >= 1 ? 'done' : ''}">${pr.frac >= 1 ? '✓ rendu vrai' : pct + '%'}</span></div>
+      </div>`;
       body.innerHTML = verdict + flagsHtml + mensonges +
         `<div class="lie-active">🎭 Mensonge actif : <b>${tn} ×${L.factor}</b><br>
-         Rends-le vrai (atteins <b>${this.fmtLie(L.target, L.claimed)}</b>) avant la prochaine Vertu.</div>`;
+         Rends-le vrai (atteins <b>${this.fmtLie(L.target, L.claimed)}</b>) avant la prochaine Vertu.</div>` +
+        bar;
       this.bindMensongesBtn();
       return;
     }
@@ -886,6 +894,14 @@ class UI {
       const debt = g.soulDebt || 0;
       this.$('hud-debt').classList.toggle('hidden', debt <= 0);
       if (debt > 0) this.$('debt-text').textContent = 'dette ' + this.fmt(Math.round(debt));
+      // Mensonge de Belial en cours : progression vers la vérité.
+      const pr = g.lieProgress();
+      this.$('hud-lie').classList.toggle('hidden', !pr);
+      if (pr) {
+        const pct = Math.round(pr.frac * 100);
+        this.$('lie-text').textContent = pr.frac >= 1 ? 'mensonge vrai ✓' : 'mensonge ' + pct + '%';
+        this.$('hud-lie').classList.toggle('done', pr.frac >= 1);
+      }
       // Le compte à rebours s'affole dans les 5 dernières secondes.
       this.$('hud').classList.toggle('low', g.timeLeft <= 5);
       // Fine barre de survie visible aussi sur l'onglet boutique (mobile).
@@ -901,6 +917,7 @@ class UI {
       this.$('hud-respawn').classList.add('hidden');
       this.$('hud-worldend').classList.add('hidden');
       this.$('hud-debt').classList.add('hidden');
+      this.$('hud-lie').classList.add('hidden');
     }
 
     // Fiche de pacte ouverte : on la garde à jour (coût/abordable).
