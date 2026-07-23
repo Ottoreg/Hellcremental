@@ -398,6 +398,25 @@ class Game {
     return true;
   }
 
+  /* Progression du mensonge en cours vers la « vérité » (à atteindre avant la
+   * prochaine Vertu). Renvoie { frac 0..1, real, claimed, done, needed, target }
+   * ou null s'il n'y a pas de mensonge actif. */
+  lieProgress() {
+    const L = this.lie;
+    if (!L) return null;
+    const needed = Math.max(1e-9, L.claimed - L.base);
+    let real, done;
+    if (L.target === 'souls') {
+      done = L.soulsEarned;              // âmes réellement récoltées depuis le mensonge
+      real = L.base + L.soulsEarned;     // total « rendu vrai » atteint
+    } else {
+      real = (this.stats[L.target] || 0) / L.factor; // valeur réelle (sans le mensonge)
+      done = real - L.base;
+    }
+    const frac = Math.max(0, Math.min(1, done / needed));
+    return { frac, real, claimed: L.claimed, done: Math.max(0, done), needed, target: L.target };
+  }
+
   /* Résout le mensonge en cours au moment où une Vertu est vaincue. */
   resolveLieOnVirtue() {
     // Fin d'un éventuel cycle de pénalité précédent.
