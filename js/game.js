@@ -630,6 +630,11 @@ class Game {
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
       foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
       powerDmg: 0, servantDmg: 0, lieBonus: 0,
+      // Pactes hyper-spécialisés (Astaroth).
+      packSynergy: 0, triumvirat: 0,
+      clicZone: 0, autoClic: 0, brasierEternel: 0, griffeMassacre: 0, damnationPerp: 0,
+      meteorePluie: 0, meteoreCentre: 0, meteoreGlobal: 0, foudreAuto: 0,
+      blackfire4coins: 0, blackfireSacrilege: 0, archimage: 0,
     };
   }
 
@@ -822,6 +827,10 @@ class Game {
     this.justUnlockedPrestige = false;
     this.abilityCooldowns = {};
     this.abilityUsed = {};
+    this.abilityUses = {};            // compte d'utilisations (sorts « once »)
+    this.autoClicCd = 0;             // Rafale Infernale
+    this.foudreAutoCd = 0;           // Tempête Perpétuelle
+    this.triumviratCd = 0;           // Triumvirat Maudit (onde périodique)
     this.attackers = [];
     this.attackers.push(this.makeAttacker('demon'));
     for (let i = 0; i < this.stats.minions; i++) this.attackers.push(this.makeAttacker('minion'));
@@ -835,9 +844,14 @@ class Game {
     const a = ACTIVE_ABILITIES[id];
     return a ? a.cooldown(this.upgradeLevel(id)) : 10;
   }
+  /* Nombre d'utilisations autorisées pour un sort « once ». La Damnation
+   * Perpétuelle (Astaroth) autorise 2 lancers de Damnation Finale par niveau. */
+  maxAbilityUses(id) {
+    return (id === 'finisher' && this.stats && this.stats.damnationPerp > 0) ? 2 : 1;
+  }
   abilityReady(id) {
     const meta = ACTIVE_ABILITIES[id];
-    if (meta && meta.once && this.abilityUsed[id]) return false; // 1×/niveau déjà utilisé
+    if (meta && meta.once && this.abilityUsed[id]) return false; // limite atteinte
     return (this.abilityCooldowns[id] || 0) <= 0;
   }
 
@@ -850,8 +864,14 @@ class Game {
     else if (id === 'flammes_noires') this.castBlackfire();
     else if (id === 'finisher') this.castFinisher();
     const meta = ACTIVE_ABILITIES[id];
-    if (meta && meta.once) this.abilityUsed[id] = true;
-    else this.abilityCooldowns[id] = this.abilityCooldownMax(id);
+    if (meta && meta.once) {
+      this.abilityUses[id] = (this.abilityUses[id] || 0) + 1;
+      // « abilityUsed » ne se verrouille qu'une fois la limite atteinte.
+      if (this.abilityUses[id] >= this.maxAbilityUses(id)) this.abilityUsed[id] = true;
+      else this.abilityCooldowns[id] = this.abilityCooldownMax(id); // recharge entre 2 usages
+    } else {
+      this.abilityCooldowns[id] = this.abilityCooldownMax(id);
+    }
     return true;
   }
 
@@ -860,15 +880,42 @@ class Game {
     const s = this.stats;
     const n = Math.max(1, s.meteore);
     const alive = this.targets.filter(t => !t.dead);
-    if (!alive.length) return;
-    // Centre sur une case occupée au hasard (pour toucher quelque chose).
-    const c = alive[Math.floor(Math.random() * alive.length)];
+    if (!alive.length && !s.meteoreCentre) return;
     const dmg = Math.round(s.damage * (8 + n * 2) * (1 + s.powerDmg));
     const rad = 1 + s.meteoreZone; // Cœur du Météore agrandit la zone
-    this.spawnMeteor(c.gx, c.gy, rad);
+    // Météore Apocalyptique (Astaroth) : toute la carte, dégâts réduits.
+    if (s.meteoreGlobal > 0) {
+      const gdmg = Math.round(dmg * 0.4);
+      for (let i = 0; i < 6; i++)
+        this.spawnMeteor(Math.random() * this.gridSize, Math.random() * this.gridSize, 1);
+      for (const t of this.targets) {
+        if (t.dead) continue;
+        t.hp -= gdmg; t.shake = 0.3;
+        if (t.hp <= 0) this.destroyTarget(t);
+      }
+      return;
+    }
+    // Pluie de Météores (Astaroth) : 3 impacts successifs.
+    const shots = s.meteorePluie > 0 ? 3 : 1;
+    for (let i = 0; i < shots; i++) {
+      let cx, cy;
+      if (s.meteoreCentre > 0) { // Météore Centré : toujours la case centrale.
+        cx = Math.floor(this.gridSize / 2); cy = Math.floor(this.gridSize / 2);
+      } else {
+        const al = this.targets.filter(t => !t.dead);
+        if (!al.length) break;
+        const c = al[Math.floor(Math.random() * al.length)];
+        cx = c.gx; cy = c.gy;
+      }
+      this.meteorStrike(cx, cy, rad, dmg);
+    }
+  }
+
+  meteorStrike(cx, cy, rad, dmg) {
+    this.spawnMeteor(cx, cy, rad);
     for (const t of this.targets) {
       if (t.dead) continue;
-      if (Math.abs(t.gx - c.gx) <= rad && Math.abs(t.gy - c.gy) <= rad) {
+      if (Math.abs(t.gx - cx) <= rad && Math.abs(t.gy - cy) <= rad) {
         t.hp -= dmg; t.shake = 0.3;
         if (t.hp <= 0) this.destroyTarget(t);
       }
@@ -877,6 +924,17 @@ class Game {
 
   /* Flammes Noires : dépose un feu noir persistant qui se propage sur la grille. */
   castBlackfire() {
+    // Flammes des 4 Coins (Astaroth) : quatre foyers, un par coin de la carte.
+    if (this.stats.blackfire4coins > 0) {
+      const m = this.gridSize - 1;
+      for (const [cx, cy] of [[0, 0], [m, 0], [0, m], [m, m]]) {
+        for (let dx = 0; dx <= 1; dx++)
+          for (let dy = 0; dy <= 1; dy++)
+            this.igniteBlackfire(cx + (cx === 0 ? dx : -dx), cy + (cy === 0 ? dy : -dy));
+      }
+      this.addFloater(this.gridSize / 2, this.gridSize / 2, '🖤', '#b06bff');
+      return;
+    }
     const alive = this.targets.filter(t => !t.dead);
     const c = alive.length
       ? alive[Math.floor(Math.random() * alive.length)]
@@ -1251,6 +1309,7 @@ class Game {
 
     // Arc Éternel : arc permanent entre foudroyeurs qui brûle les cases traversées.
     this.updateFoudroyeurArc(dt, s);
+    this.updateHyperEffects(dt, s);
 
     // Réapparition (niveaux 31+) : les entités vivantes abattues reviennent
     // après un délai si le niveau n'est pas encore nettoyé.
@@ -1303,6 +1362,119 @@ class Game {
         if (t.hp <= 0) this.destroyTarget(t);
       }
     }
+  }
+
+  /* Effets runtime des pactes hyper-spécialisés (Astaroth). */
+  updateHyperEffects(dt, s) {
+    // Rafale Infernale : clic auto sur la cible la plus proche du démon.
+    if (s.autoClic > 0 && s.clickUnlocked) {
+      this.autoClicCd -= dt;
+      if (this.autoClicCd <= 0) {
+        this.autoClicCd = 1 / (2 + s.autoClic * 0.6);
+        const demon = this.attackers[0];
+        const t = demon ? this.nearestTarget(demon) : null;
+        if (t) {
+          const massacre = s.griffeMassacre > 0
+            ? (1 + Math.min(s.griffeMassacre, s.griffeMassacre * 0.02 * this.runDestroyed)) : 1;
+          const dmg = (this.clickBuff > 0 ? s.clickDamage * this.clickBuffMult : s.clickDamage) * massacre;
+          this.hitTarget(t, dmg, demon);
+          this.spawnClickBurst(t);
+        }
+      }
+    }
+    // Tempête Perpétuelle : la Foudre s'abat automatiquement.
+    if (s.foudreAuto > 0 && s.foudre > 0) {
+      this.foudreAutoCd -= dt;
+      if (this.foudreAutoCd <= 0) {
+        this.foudreAutoCd = Math.max(1.5, 4 - s.foudreAuto * 0.4);
+        this.castFoudre();
+      }
+    }
+    // Archimage Démoniaque : trou noir sous la souris (dégâts + vol d'âmes).
+    if (this.mouseHoverT > 0) this.mouseHoverT -= dt;
+    if (s.archimage > 0 && this.mouseHoverT > 0 && this.mouseGx != null) {
+      const R = 1.4;
+      const dps = s.damage * 3 * (1 + s.powerDmg);
+      let drained = 0;
+      for (const t of this.targets) {
+        if (t.dead) continue;
+        if (Math.hypot(t.gx - this.mouseGx, t.gy - this.mouseGy) <= R) {
+          t.hp -= dps * dt; t.shake = 0.12; drained++;
+          if (t.hp <= 0) this.destroyTarget(t);
+        }
+      }
+      if (drained > 0) this.souls += Math.max(1, Math.round(drained * 3 * dt * s.soulMult));
+      this._archT = (this._archT || 0) - dt;
+      if (this._archT <= 0) { this._archT = 0.025; this.spawnBlackholeParticle(); }
+    }
+    // Triumvirat Maudit : ondes de choc périodiques + arcs continus (fusion).
+    if (s.triumvirat > 0) {
+      this.triumviratCd -= dt;
+      if (this.triumviratCd <= 0) {
+        this.triumviratCd = 5;
+        for (const a of this.attackers)
+          if (a.isVagabond || a.isStormling) this.triumviratShock(a, s);
+      }
+      this.triumviratArcs(dt, s);
+    } else { this.hyperArcs = null; }
+  }
+
+  triumviratShock(a, s) {
+    const dmg = s.damage * 2.5 * (1 + s.servantDmg);
+    this.impacts.push({ gx: a.gx, gy: a.gy, life: 0.4, max: 0.4, rad: 1 });
+    for (const o of this.targets) {
+      if (o.dead) continue;
+      if (Math.abs(o.gx - a.gx) <= 1.2 && Math.abs(o.gy - a.gy) <= 1.2) {
+        o.hp -= dmg; o.shake = 0.2;
+        if (o.hp <= 0) this.destroyTarget(o);
+      }
+    }
+  }
+
+  triumviratArcs(dt, s) {
+    const storms = this.attackers.filter(x => x.isStormling);
+    const vags = this.attackers.filter(x => x.isVagabond);
+    const demo = this.attackers.find(x => x.isDemolisher);
+    const dps = s.damage * 1.8 * (1 + s.servantDmg);
+    const segs = [];
+    if (demo) for (const st of storms) segs.push([st, demo]);
+    for (let i = 0; i + 1 < vags.length; i += 2) segs.push([vags[i], vags[i + 1]]);
+    for (const [A, B] of segs) {
+      for (const t of this.targets) {
+        if (t.dead) continue;
+        if (this.distToSegment(t.gx, t.gy, A.gx, A.gy, B.gx, B.gy) <= 0.6) {
+          t.hp -= dps * dt;
+          if (t.hp <= 0) this.destroyTarget(t);
+        }
+      }
+    }
+    this.hyperArcs = segs.map(([A, B]) => ({ ax: A.gx, ay: A.gy, bx: B.gx, by: B.gy }));
+    // Feedback : étincelles de peste au milieu de chaque arc.
+    this._triT = (this._triT || 0) - dt;
+    if (this._triT <= 0 && segs.length) {
+      this._triT = 0.06;
+      const seg = this.hyperArcs[Math.floor(Math.random() * this.hyperArcs.length)];
+      const mx = (seg.ax + seg.bx) / 2, my = (seg.ay + seg.by) / 2;
+      const w = Iso.toScreen(mx + (Math.random() - 0.5), my + (Math.random() - 0.5));
+      this.particles.push({
+        x: w.x, y: w.y - 8, vx: (Math.random() - 0.5) * 20, vy: -20 - Math.random() * 30,
+        g: -10, life: 0.4 + Math.random() * 0.3,
+        color: Math.random() < 0.5 ? '#7bd47b' : '#b06bff', size: 2 + Math.random() * 2,
+      });
+    }
+  }
+
+  spawnBlackholeParticle() {
+    if (this.mouseGx == null) return;
+    const ang = Math.random() * Math.PI * 2, r = 1.3 + Math.random() * 0.4;
+    const w = Iso.toScreen(this.mouseGx + Math.cos(ang) * r, this.mouseGy + Math.sin(ang) * r);
+    const c = Iso.toScreen(this.mouseGx, this.mouseGy);
+    // Particule aspirée vers le centre du trou noir.
+    this.particles.push({
+      x: w.x, y: w.y - 6, vx: (c.x - w.x) * 3, vy: (c.y - w.y) * 3,
+      g: 0, life: 0.35,
+      color: Math.random() < 0.5 ? '#3a1050' : '#7b2fb0', size: 2 + Math.random() * 2.5,
+    });
   }
 
   distToSegment(px, py, ax, ay, bx, by) {
@@ -1398,12 +1570,18 @@ class Game {
   /* Dégâts d'un attaquant sur une cible donnée. */
   attackerDamage(a, t, s) {
     if (a.isDemon) return s.damage;
+    // Synergie de Meute (Astaroth) : chaque serviteur vivant renforce la meute.
+    let pack = 1;
+    if (s.packSynergy > 0) {
+      const nServ = this.attackers.reduce((c, x) => c + (x.isDemon ? 0 : 1), 0);
+      pack = 1 + s.packSynergy * nServ;
+    }
     if (a.isDemolisher) {
       let dmg = s.damage * 2;                 // colosse : frappe lourde
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
-      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg);
+      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg) * pack;
     }
-    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg)); // serviteur
+    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg) * pack); // serviteur
   }
 
   hitTarget(t, dmg, source) {
@@ -1458,6 +1636,16 @@ class Game {
     if (this.lie && this.lie.target === 'souls') this.lie.soulsEarned += gain;
     // Convoitise du Sacré (Léviathan) : exorciser un prêtre te rend du temps.
     if (t.priest && this.stats.priestSteal > 0 && this.phase === 'playing') this.timeLeft += this.stats.priestSteal;
+    // Flammes Sacrilèges (Astaroth) : prêtre/Vertu détruit → foyer de feu noir.
+    if (this.stats.blackfireSacrilege > 0 && (t.priest || (t.def && t.def.virtue))) {
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          this.igniteBlackfire(Math.round(t.gx) + dx, Math.round(t.gy) + dy);
+    }
+    // Damnation Perpétuelle (Astaroth) : chaque kill prolonge la furie active.
+    if (this.stats.damnationPerp > 0 && this.clickBuff > 0) {
+      this.clickBuff = Math.min(15, this.clickBuff + 0.4);
+    }
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) {
       this.grid[t.gy][t.gx].scorched = true;
       this.grid[t.gy][t.gx].occupied = false;
@@ -1503,13 +1691,18 @@ class Game {
     if (t) {
       // Furie de clic (Damnation Finale) : dégâts décuplés + frappe en zone.
       const buffed = this.clickBuff > 0;
-      const dmg = buffed ? s.clickDamage * this.clickBuffMult : s.clickDamage;
+      // Griffe du Massacre (Astaroth) : les dégâts de clic montent avec les kills.
+      const massacre = s.griffeMassacre > 0
+        ? (1 + Math.min(s.griffeMassacre, s.griffeMassacre * 0.02 * this.runDestroyed)) : 1;
+      const dmg = (buffed ? s.clickDamage * this.clickBuffMult : s.clickDamage) * massacre;
       // Redirige le démon et inflige des dégâts de clic.
       this.attackers[0].target = t;
       this.hitTarget(t, dmg, this.attackers[0]);
       this.spawnClickBurst(t);
-      if (buffed) {
-        const R = this.clickBuffRadius;
+      // Frappe en zone : furie (Damnation) OU Poigne Sismique (clic 3×3).
+      const zone = buffed || s.clicZone > 0;
+      if (zone) {
+        const R = buffed ? this.clickBuffRadius : 1;
         for (const o of this.targets) {
           if (o.dead || o === t) continue;
           if (Math.abs(o.gx - t.gx) <= R && Math.abs(o.gy - t.gy) <= R) {
@@ -1536,7 +1729,8 @@ class Game {
       gx, gy,
       radius: 1.1 + n * 0.03,
       dps: this.stats.clickDamage * (0.5 + 0.15 * n),
-      life: 3 + n * 0.3,
+      // Brasier Éternel (Astaroth) : la nappe ne s'éteint plus du niveau.
+      life: this.stats.brasierEternel > 0 ? 1e9 : 3 + n * 0.3,
       tick: 0,
     });
     this.addFloater(gx, gy, '🔥', '#ff8a2a');
@@ -1560,6 +1754,11 @@ class Game {
   updateHover(sx, sy) {
     if (this.phase !== 'playing') { this.hover = null; return; }
     this.hover = this.targetAtScreen(sx, sy);
+    // Position de la souris sur la grille (pour l'Archimage : trou noir).
+    const w = this.cam.screenToWorld(sx, sy);
+    const g = Iso.toGrid(w.x, w.y);
+    this.mouseGx = g.gx; this.mouseGy = g.gy;
+    this.mouseHoverT = 0.2; // « fraîcheur » : le trou noir suit tant que ça bouge
   }
 
   /* ---------------------- Fin de vie ---------------------- */
@@ -1805,18 +2004,18 @@ class Game {
     ctx.globalAlpha = 1;
 
     // --- Arc permanent entre foudroyeurs (trait Foudroyeur) ---
-    if (this.arc) {
-      const wa = Iso.toScreen(this.arc.ax, this.arc.ay);
-      const wb = Iso.toScreen(this.arc.bx, this.arc.by);
+    const drawArc = (arc, stroke, glow) => {
+      const wa = Iso.toScreen(arc.ax, arc.ay);
+      const wb = Iso.toScreen(arc.bx, arc.by);
       const pa = cam.worldToScreen(wa.x, wa.y);
       const pb = cam.worldToScreen(wb.x, wb.y);
       const midY = -34 * cam.scale; // léger décollement du sol
       const dx = pb.x - pa.x, dy = pb.y - pa.y;
       const len = Math.hypot(dx, dy) || 1;
       const nx = -dy / len, ny = dx / len; // normale pour le jitter
-      ctx.strokeStyle = '#dff2ff';
+      ctx.strokeStyle = stroke;
       ctx.lineWidth = 2.4 * cam.scale;
-      ctx.shadowColor = '#7fd0ff';
+      ctx.shadowColor = glow;
       ctx.shadowBlur = 12 * cam.scale;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
@@ -1833,6 +2032,22 @@ class Game {
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
+    };
+    if (this.arc) drawArc(this.arc, '#dff2ff', '#7fd0ff');
+    // Arcs du Triumvirat Maudit (Astaroth).
+    if (this.hyperArcs) for (const a of this.hyperArcs) drawArc(a, '#c9a0ff', '#7b2fb0');
+    // Trou noir de l'Archimage Démoniaque (Astaroth) : disque sombre pulsant.
+    if (this.stats && this.stats.archimage > 0 && this.mouseHoverT > 0 && this.mouseGx != null) {
+      const w = Iso.toScreen(this.mouseGx, this.mouseGy);
+      const c = cam.worldToScreen(w.x, w.y);
+      const cy = c.y - 14 * cam.scale;
+      const rr = (26 + Math.sin(Date.now() / 120) * 4) * cam.scale;
+      const grad = ctx.createRadialGradient(c.x, cy, 1, c.x, cy, rr);
+      grad.addColorStop(0, 'rgba(10,0,20,0.95)');
+      grad.addColorStop(0.6, 'rgba(80,20,140,0.55)');
+      grad.addColorStop(1, 'rgba(80,20,140,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(c.x, cy, rr, 0, Math.PI * 2); ctx.fill();
     }
 
     // --- Impacts de météore (traînée + onde de choc) ---

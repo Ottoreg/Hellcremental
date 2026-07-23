@@ -476,6 +476,118 @@ const UPGRADES = [
     effect: (n) => `Mensonge tenu : +${1 + n} pt${1 + n > 1 ? 's' : ''} de prestige`,
     apply: (s, n) => { s.lieBonus = n; },
   },
+
+  // ================= Pactes HYPER-SPÉCIALISÉS (Astaroth) =================
+  // Réservés à l'incarnation Astaroth (reqHyper) et à la voie choisie (reqVoie).
+  // --- Voie des Légions ---
+  {
+    id: 'legion_infinie', name: 'Légion Sans Fin', emoji: '♾️',
+    desc: 'Repousse les limites de ta horde : davantage d\'esprits, de vagabonds et de foudroyeurs.',
+    baseCost: 300000, mult: 2, max: 3,
+    effect: (n) => `+${2 * n} esprits · +${n} vagabond${n > 1 ? 's' : ''} · +${n} foudroyeur${n > 1 ? 's' : ''}`,
+    apply: (s, n) => { s.minions += 2 * n; s.vagabond += n; s.stormling += n; },
+  },
+  {
+    id: 'synergie_meute', name: 'Synergie de Meute', emoji: '🐺',
+    desc: 'Chaque serviteur vivant renforce les dégâts de toute la meute.',
+    baseCost: 250000, mult: 1.6, max: 4,
+    effect: (n) => `+${5 * n}% de dégâts serviteurs par serviteur vivant`,
+    apply: (s, n) => { s.packSynergy += 0.05 * n; },
+  },
+  {
+    id: 'triumvirat', name: 'Triumvirat Maudit', emoji: '🔺',
+    desc: 'Tes trois traits fusionnent : ondes de choc autour des vagabonds et foudroyeurs, ' +
+          'arcs reliant colosse et servants, peste projetée à chaque éclair de foudroyeur.',
+    baseCost: 2000000, mult: 1, max: 1,
+    effect: () => 'Fusion des 3 traits de serviteur',
+    apply: (s, n) => { s.triumvirat = n; },
+  },
+  // --- Voie du Clic ---
+  {
+    id: 'poigne_sismique', name: 'Poigne Sismique', emoji: '🌐',
+    desc: 'Ton clic infernal frappe désormais toute une zone 3×3.',
+    baseCost: 300000, mult: 1, max: 1,
+    effect: () => 'Le clic frappe en zone 3×3',
+    apply: (s, n) => { s.clicZone = n; },
+  },
+  {
+    id: 'rafale_infernale', name: 'Rafale Infernale', emoji: '💢',
+    desc: 'Ta griffe frappe seule la cible la plus proche, encore et encore.',
+    baseCost: 400000, mult: 1.6, max: 5,
+    effect: (n) => `Clic automatique ${(2 + n * 0.6).toFixed(1)}×/s`,
+    apply: (s, n) => { s.autoClic = n; },
+  },
+  {
+    id: 'brasier_eternel', name: 'Brasier Éternel', emoji: '🔥',
+    desc: 'Tes nappes de feu ne s\'éteignent plus : le sol embrasé le reste tout le niveau.',
+    baseCost: 350000, mult: 1, max: 1,
+    effect: () => 'Nappes de feu permanentes',
+    apply: (s, n) => { s.brasierEternel = n; },
+  },
+  {
+    id: 'griffe_massacre', name: 'Griffe du Massacre', emoji: '📈',
+    desc: 'Chaque destruction du niveau renforce tes dégâts de clic (remis à zéro au niveau suivant).',
+    baseCost: 300000, mult: 1.6, max: 3,
+    effect: (n) => `Dégâts de clic ↑ avec les destructions (jusqu'à ×${1 + n})`,
+    apply: (s, n) => { s.griffeMassacre += n; },
+  },
+  {
+    id: 'damnation_perp', name: 'Damnation Perpétuelle', emoji: '👹',
+    desc: 'La furie de la Damnation Finale se prolonge à chaque destruction et peut être relancée deux fois par niveau.',
+    baseCost: 2000000, mult: 1, max: 1,
+    effect: () => 'Furie prolongée par les kills · 2×/niveau',
+    apply: (s, n) => { s.damnationPerp = n; },
+  },
+  // --- Voie de la Magie ---
+  {
+    id: 'meteore_pluie', name: 'Pluie de Météores', emoji: '☄️',
+    desc: 'Ton Météore tombe en trois impacts successifs sur des zones au hasard.',
+    baseCost: 500000, mult: 1, max: 1,
+    effect: () => '3 météores par lancer',
+    apply: (s, n) => { s.meteorePluie = n; },
+  },
+  {
+    id: 'meteore_centre', name: 'Météore Centré', emoji: '🎯',
+    desc: 'Ton Météore vise toujours le centre de la carte, même inoccupé.',
+    baseCost: 400000, mult: 1, max: 1,
+    effect: () => 'Vise toujours le centre',
+    apply: (s, n) => { s.meteoreCentre = n; },
+  },
+  {
+    id: 'meteore_global', name: 'Météore Apocalyptique', emoji: '🌍',
+    desc: 'Ton Météore s\'abat sur la carte ENTIÈRE (dégâts réduits).',
+    baseCost: 800000, mult: 1, max: 1,
+    effect: () => 'Frappe toute la carte · dégâts réduits',
+    apply: (s, n) => { s.meteoreGlobal = n; },
+  },
+  {
+    id: 'tempete_perp', name: 'Tempête Perpétuelle', emoji: '🌩️',
+    desc: 'La Foudre Infernale s\'abat automatiquement, encore et encore.',
+    baseCost: 500000, mult: 1.6, max: 5,
+    effect: (n) => `Foudre auto toutes les ${Math.max(1.5, 4 - n * 0.4).toFixed(1)}s`,
+    apply: (s, n) => { s.foudreAuto = n; },
+  },
+  {
+    id: 'flammes_coins', name: 'Flammes des 4 Coins', emoji: '🪔',
+    desc: 'Le feu noir s\'embrase depuis les quatre coins de la carte.',
+    baseCost: 600000, mult: 1, max: 1,
+    effect: () => 'Feu noir aux 4 coins',
+    apply: (s, n) => { s.blackfire4coins = n; },
+  },
+  {
+    id: 'flammes_sacrilege', name: 'Flammes Sacrilèges', emoji: '✝️',
+    desc: 'Chaque prêtre ou Vertu détruit déclenche un foyer de feu noir.',
+    baseCost: 700000, mult: 1, max: 1,
+    effect: () => 'Feu noir sur prêtre/Vertu détruit',
+    apply: (s, n) => { s.blackfireSacrilege = n; },
+  },
+  {
+    id: 'archimage', name: 'Archimage Démoniaque', emoji: '🕳️',
+    desc: 'Sous ta souris, un trou noir aspire les âmes : dégâts continus et âmes bonus arrachées aux cibles happées.',
+    baseCost: 2500000, mult: 1, max: 1,
+    effect: () => 'Trou noir sous la souris · dégâts + vol d\'âmes',
+    apply: (s, n) => { s.archimage = n; },
+  },
 ];
 
 /* Attaques actives : métadonnées (recharge ; `once` = une seule fois par niveau). */
@@ -551,6 +663,26 @@ const SKILL_TREE = [
   { id: 'clic_demon',  x: 280, y: 55,  parent: 'voie_clic', req: 1 },
   { id: 'nappe_feu',   x: 205, y: 170, parent: 'voie_clic', req: 1 },
   { id: 'finisher',    x: 140, y: 75,  parent: 'clic_demon', req: 1 },
+
+  // ===== Pactes hyper-spécialisés (Astaroth) — visibles seulement en l'incarnant =====
+  // Voie des Légions
+  { id: 'legion_infinie',  x: 400, y: 710,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
+  { id: 'synergie_meute',  x: 400, y: 855,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
+  { id: 'triumvirat',      x: 1200, y: 1090, reqAll: ['demo_trait', 'vagabond_trait', 'foudroyeur_trait'], reqVoie: 'voie_legion', reqHyper: true, hyper: true },
+  // Voie du Clic
+  { id: 'poigne_sismique', x: 360, y: 180, parent: 'clic_demon', req: 1, reqVoie: 'voie_clic', reqHyper: true, hyper: true },
+  { id: 'griffe_massacre', x: 445, y: 110, parent: 'clic_demon', req: 1, reqVoie: 'voie_clic', reqHyper: true, hyper: true },
+  { id: 'rafale_infernale',x: 210, y: 255, parent: 'clic_demon', req: 1, reqVoie: 'voie_clic', reqHyper: true, hyper: true },
+  { id: 'brasier_eternel', x: 85,  y: 245, parent: 'nappe_feu',  req: 1, reqVoie: 'voie_clic', reqHyper: true, hyper: true },
+  { id: 'damnation_perp',  x: 55,  y: 150, reqAll: ['finisher'], reqVoie: 'voie_clic', reqHyper: true, hyper: true },
+  // Voie de la Magie
+  { id: 'meteore_pluie',    x: 1470, y: 30,  parent: 'meteore', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'meteore_centre',   x: 1500, y: 165, parent: 'meteore', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'meteore_global',   x: 1440, y: 250, parent: 'meteore', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'tempete_perp',     x: 1120, y: 20,  parent: 'foudre',  req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'flammes_coins',    x: 1450, y: 370, parent: 'flammes_noires', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'flammes_sacrilege',x: 1300, y: 435, parent: 'flammes_noires', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
+  { id: 'archimage',        x: 1480, y: 480, parent: 'flammes_noires', req: 1, reqVoie: 'voie_magie', reqHyper: true, hyper: true },
 ];
 
 /* -------------------------------------------------------------------------
