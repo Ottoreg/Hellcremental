@@ -679,8 +679,15 @@ const INCARNATIONS = [
           'Vertu : si tu l\'as rendu vrai, tu gagnes un point de prestige bonus ; ' +
           'sinon, tu paies le prix (malus de stat ou dette d\'âmes).',
   },
-  { id: 'soon2', name: '???', title: 'À venir', emoji: '🔒', color: '#555', available: false,
-    desc: 'Un autre démon primordial sommeille encore...' },
+  {
+    id: 'astaroth', name: 'Astaroth', title: 'Grand-Duc de l\'Hyper-Spécialisation',
+    emoji: '👑', color: '#f0b429', available: true,
+    desc: 'HYPER-SPÉCIALISATION : la PREMIÈRE voie que tu choisis devient ta ' +
+          'seule et unique voie — les autres se verrouillent définitivement, et ' +
+          'le Serment du Chaos est banni (s\'il était déjà scellé, Astaroth t\'en ' +
+          'rembourse la moitié). En échange, ta voie révèle de nouveaux pactes ' +
+          'ultimes qui parachèvent ta spécialisation.',
+  },
   { id: 'soon3', name: '???', title: 'À venir', emoji: '🔒', color: '#555', available: false,
     desc: 'Un autre démon primordial sommeille encore...' },
 ];

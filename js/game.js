@@ -360,10 +360,32 @@ class Game {
     this.incarnation = id;
     // Changer d'incarnation annule un mensonge en cours.
     this.lie = null; this.lieMalus = null;
+    // Astaroth bannit le Serment du Chaos : s'il était déjà scellé, on en
+    // rembourse la moitié et on le retire (l'exclusivité des voies redevient
+    // absolue → une seule voie possible).
+    this.astarothRefund = 0;
+    if (id === 'astaroth' && this.upgradeLevel('pacte_libre') >= 1) {
+      const def = UPGRADES.find(u => u.id === 'pacte_libre');
+      const refund = Math.floor((def.baseCost || 0) / 2);
+      this.souls += refund;
+      delete this.upgrades['pacte_libre'];
+      this.astarothRefund = refund; // pour le retour visuel
+    }
     this.computeStats(this.phase === 'playing' ? false : true);
     this.save();
     this.onChange();
     return true;
+  }
+
+  /* Astaroth : les voies redeviennent exclusives (le Serment du Chaos ne peut
+   * plus lever l'exclusivité). Vrai uniquement HORS Astaroth avec le Serment. */
+  voiesFree() { return this.upgradeLevel('pacte_libre') >= 1 && this.incarnation !== 'astaroth'; }
+  /* Voie hyper-spécialisée en cours (Astaroth) : la première voie possédée. */
+  hyperVoie() {
+    if (this.incarnation !== 'astaroth') return null;
+    for (const v of ['voie_magie', 'voie_legion', 'voie_clic'])
+      if (this.upgradeLevel(v) >= 1) return v;
+    return null;
   }
 
   /* ---------------------- Mensonge de Belial ---------------------- */
@@ -550,9 +572,11 @@ class Game {
   isUnlocked(id) {
     const node = SKILL_TREE.find(n => n.id === id);
     if (!node) return true;
+    // Pacte hyper-spécialisé (Astaroth) : accessible seulement en incarnant Astaroth.
+    if (node.reqHyper && this.incarnation !== 'astaroth') return false;
     // Voies exclusives : choisir l'une verrouille les autres du même groupe.
-    // Le Serment du Chaos Absolu (pacte_libre) lève cette exclusivité.
-    if (node.group && this.upgradeLevel('pacte_libre') < 1) {
+    // Le Serment du Chaos lève cette exclusivité — sauf sous Astaroth.
+    if (node.group && !this.voiesFree()) {
       const rival = SKILL_TREE.some(o =>
         o.group === node.group && o.id !== id && this.upgradeLevel(o.id) >= 1);
       if (rival) return false;
@@ -571,6 +595,8 @@ class Game {
     if (!def) return false;
     // Pacte spécial d'incarnation (ex. Mensonges) : réservé au démon incarné.
     if (def.special && this.incarnation !== def.special) return false;
+    // Astaroth bannit le Serment du Chaos : impossible de le sceller.
+    if (id === 'pacte_libre' && this.incarnation === 'astaroth') return false;
     if (!this.isUnlocked(id)) return false; // parent pas encore invoqué
     const n = this.upgradeLevel(id);
     if (n >= def.max) return false;
@@ -627,7 +653,7 @@ class Game {
     for (const def of UPGRADES) { const n = this.upgradeLevel(def.id); if (n > 0) src(def.name, def.emoji, () => def.apply(s, n)); }
     for (const dmn of PRIMORDIAL_DEMONS) { if (this.demonUnlocked(dmn.id)) src(dmn.name, dmn.emoji || '👑', () => dmn.apply(s)); }
     for (const pu of PRESTIGE_UPGRADES) { const pn = this.prestigeUpgradeLevel(pu.id); if (pn > 0) src(pu.name, pu.emoji || '🔻', () => pu.apply(s, pn)); }
-    if (this.upgradeLevel('pacte_libre') >= 1) src('Serment du Chaos', '⛓️', () => { s.lifespan *= 0.5; });
+    if (this.upgradeLevel('pacte_libre') >= 1 && this.incarnation !== 'astaroth') src('Serment du Chaos', '⛓️', () => { s.lifespan *= 0.5; });
     if (this.lie && this.lie.target !== 'souls' && typeof s[this.lie.target] === 'number')
       src('Mensonge de Belial', '🎭', () => { s[this.lie.target] *= this.lie.factor; });
     if (this.lieMalus && typeof s[this.lieMalus.target] === 'number')
@@ -654,7 +680,7 @@ class Game {
     // Malus du Serment du Chaos Absolu : ta puissance démoniaque attire les
     // exorcistes → le temps avant exorcisme est divisé par 2 (appliqué sur le
     // total, après tous les bonus de longévité).
-    if (this.upgradeLevel('pacte_libre') >= 1) s.lifespan *= 0.5;
+    if (this.upgradeLevel('pacte_libre') >= 1 && this.incarnation !== 'astaroth') s.lifespan *= 0.5;
     // Mensonge de Belial : gonfle la statistique visée jusqu'à la prochaine Vertu.
     if (this.lie && this.lie.target !== 'souls' && typeof s[this.lie.target] === 'number') {
       s[this.lie.target] *= this.lie.factor;
