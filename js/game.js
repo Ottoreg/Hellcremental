@@ -31,6 +31,7 @@ class Game {
     this.lieMalus = null;      // pénalité d'un mensonge non tenu { target, factor }
     this.soulDebt = 0;         // dette d'âmes à rembourser (mensonge sur les âmes)
     this.pendingPrestigeBonus = 0; // points de prestige bonus (mensonges tenus)
+    this.worldEndCyclePoints = 0;  // points de prestige gagnés en Fin du Monde ce cycle
     this.lastLieResult = null; // dernier verdict de mensonge (feedback UI)
     this.totalDestroyed = 0;
     this.bestLevel = 1;
@@ -101,6 +102,7 @@ class Game {
       lieMalus: this.lieMalus,
       soulDebt: this.soulDebt,
       pendingPrestigeBonus: this.pendingPrestigeBonus,
+      worldEndCyclePoints: this.worldEndCyclePoints,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
       run: null,
@@ -168,6 +170,7 @@ class Game {
     this.lieMalus = d.lieMalus || null;
     this.soulDebt = d.soulDebt || 0;
     this.pendingPrestigeBonus = d.pendingPrestigeBonus || 0;
+    this.worldEndCyclePoints = d.worldEndCyclePoints || 0;
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
     this.worldEnd = null; // une épreuve en cours ne survit pas à un rechargement
@@ -194,6 +197,7 @@ class Game {
     this.everBought = {}; this.prestigeHistory = []; this.cycleRavagesStart = 0;
     this.incarnation = null; this.lie = null; this.lieMalus = null;
     this.soulDebt = 0; this.pendingPrestigeBonus = 0; this.lastLieResult = null;
+    this.worldEndCyclePoints = 0;
     this.totalDestroyed = 0; this.bestLevel = 1;
     this.worldEnd = null;
     this.pendingRun = null;
@@ -312,14 +316,19 @@ class Game {
     const gained = PRESTIGE_REWARD + bonus;
     this.prestigePoints += gained;
     this.pendingPrestigeBonus = 0;
+    // Points de Fin du Monde gagnés pendant ce cycle (déjà crédités, on ne fait
+    // que les comptabiliser dans le récap).
+    const worldEndPts = this.worldEndCyclePoints || 0;
+    this.worldEndCyclePoints = 0;
     this.prestigeCount += 1;
     // Stats du cycle qui s'achève (consultables dans les options).
     this.prestigeHistory.push({
       n: this.prestigeCount,
       ravages: Math.max(0, this.totalDestroyed - (this.cycleRavagesStart || 0)),
       niveau: this.level,
-      points: gained,
+      points: gained + worldEndPts, // total réellement gagné ce cycle
       bonus,
+      worldEnd: worldEndPts,
       date: Date.now(),
     });
     this.cycleRavagesStart = this.totalDestroyed;
@@ -330,6 +339,7 @@ class Game {
     this.offerings = {};
     this.virtuesDefeated = {};
     this.lie = null; this.lieMalus = null; this.soulDebt = 0;
+    this.lastLieResult = null; // le verdict du cycle précédent ne doit pas persister
     this.pendingRun = null;
     this.phase = 'idle';
     this.computeStats(true);
@@ -917,6 +927,7 @@ class Game {
   /* Les 7 Vertus vaincues d'affilée : +5 points de prestige. */
   winWorldEnd() {
     this.prestigePoints += WORLDEND_REWARD;
+    this.worldEndCyclePoints += WORLDEND_REWARD; // comptabilisé dans le récap du cycle
     const result = {
       cleared: true, worldEnd: 'won', prestigeBonus: WORLDEND_REWARD,
       destroyed: this.runDestroyed, total: this.runDestroyed,
