@@ -2037,6 +2037,32 @@ class Game {
       ctx.fill();
     }
 
+    // --- Zone de soin / résurrection des anges & archanges (au sol) ---
+    // Cercle céleste léger montrant le rayon d'action (mécanique en Phase 2).
+    for (const t of this.targets) {
+      if (t.dead || !(t.def && t.def.heals)) continue;
+      const w = Iso.toScreen(t.gx, t.gy);
+      const p = cam.worldToScreen(w.x, w.y);
+      const R = (t.def.auraR || 1.6) * CONFIG.TILE_W * 0.62 * cam.scale;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 420 + t.gx * 1.7 + t.gy);
+      const a = 0.12 + pulse * 0.10;
+      // Halo doux au sol.
+      const grd = ctx.createRadialGradient(p.x, p.y, R * 0.2, p.x, p.y, R);
+      grd.addColorStop(0, `rgba(255,244,190,${a})`);
+      grd.addColorStop(0.7, `rgba(255,232,150,${a * 0.5})`);
+      grd.addColorStop(1, 'rgba(255,232,150,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Anneau fin délimitant la zone.
+      ctx.strokeStyle = `rgba(255,240,175,${0.35 + pulse * 0.2})`;
+      ctx.lineWidth = 1.5 * cam.scale;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // --- Objets + attaquants triés par profondeur (gx+gy) ---
     const drawList = [];
     for (const t of this.targets) {

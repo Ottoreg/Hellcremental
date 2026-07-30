@@ -884,19 +884,24 @@ const STAT_ROWS = [
  * ========================================================================= */
 
 /* -------- Cibles célestes (monde des Cieux) -------- */
+// NB : emojis à codepoint unique (pas de sélecteur VS16 U+FE0F) — les séquences
+// VS16 comme ☁️/🕊️/🏛️/⚔️ se décentrent hors de leur case sur certains
+// navigateurs. On leur préfère des emojis « présentation emoji par défaut ».
 Object.assign(TARGET_TYPES, {
-  nuee:        { name: 'Nuée',            emoji: '☁️', hp: 9,   value: 3,  living: false },
+  nuee:        { name: 'Nuée',            emoji: '⛅', hp: 9,   value: 3,  living: false },
   astre:       { name: 'Astre',          emoji: '⭐', hp: 14,  value: 6,  living: false },
-  colombe:     { name: 'Colombe',        emoji: '🕊️', hp: 12,  value: 9,  living: true  },
+  colombe:     { name: 'Colombe',        emoji: '🐦', hp: 12,  value: 9,  living: true  },
   benitier:    { name: 'Bénitier',       emoji: '⛲', hp: 60,  value: 16, living: false },
   cloche:      { name: 'Cloche sacrée',  emoji: '🔔', hp: 78,  value: 22, living: false },
   orgue:       { name: 'Grand Orgue',    emoji: '🎹', hp: 100, value: 30, living: false },
-  temple:      { name: 'Temple de nacre',emoji: '🏛️', hp: 150, value: 44, living: false },
+  temple:      { name: 'Temple de nacre',emoji: '⛪', hp: 150, value: 44, living: false },
   sanctuaire:  { name: 'Sanctuaire',     emoji: '🛕', hp: 210, value: 62, living: false },
   elu:         { name: 'Bienheureux',    emoji: '🧑', hp: 18,  value: 15, living: true  },
   seraphinlt:  { name: 'Petit séraphin', emoji: '👼', hp: 26,  value: 20, living: true  },
-  // Ange : exorciste céleste (remplace le prêtre dans les Cieux).
-  ange:        { name: 'Ange gardien',   emoji: '😇', hp: 24,  value: 22, living: true, priestLike: true },
+  // Ange : exorciste céleste (remplace le prêtre dans les Cieux). `heals`
+  // marque une aura de soin/résurrection (mécanique en Phase 2 ; zone déjà
+  // affichée). `auraR` = rayon de la zone en cases.
+  ange:        { name: 'Ange gardien',   emoji: '😇', hp: 24,  value: 22, living: true, priestLike: true, heals: true, auraR: 1.6 },
 });
 
 /* -------- Cibles infernales (monde des Enfers) -------- */
@@ -904,7 +909,7 @@ Object.assign(TARGET_TYPES, {
   brasier:     { name: 'Brasier',        emoji: '🔥', hp: 10,  value: 4,  living: false },
   ossuaire:    { name: 'Ossuaire',       emoji: '🦴', hp: 40,  value: 12, living: false },
   tombe:       { name: 'Pierre tombale', emoji: '🪦', hp: 52,  value: 14, living: false },
-  gibet:       { name: 'Gibet',          emoji: '⛓️', hp: 58,  value: 15, living: false },
+  gibet:       { name: 'Gibet',          emoji: '🔗', hp: 58,  value: 15, living: false },
   chaudron:    { name: 'Chaudron',       emoji: '🍲', hp: 72,  value: 20, living: false },
   volcan:      { name: 'Cône de lave',   emoji: '🌋', hp: 120, value: 34, living: false },
   porte:       { name: 'Porte damnée',   emoji: '🚪', hp: 150, value: 44, living: false },
@@ -918,17 +923,20 @@ Object.assign(TARGET_TYPES, {
 });
 
 /* -------- Les 7 Archanges (boss de dizaine des Cieux) -------- */
+// Emojis à codepoint unique (⚔️ et ⚖ à VS16 se décentraient) → 🔱 et ⚡.
 const ARCHANGELS = [
-  { id: 'michel',    name: 'Michel',    emoji: '⚔️', hp: 260, value: 220 },
+  { id: 'michel',    name: 'Michel',    emoji: '🔱', hp: 260, value: 220 },
   { id: 'gabriel',   name: 'Gabriel',   emoji: '📯', hp: 280, value: 250 },
   { id: 'raphael',   name: 'Raphaël',   emoji: '🌿', hp: 300, value: 280 },
   { id: 'uriel',     name: 'Uriel',     emoji: '🔥', hp: 320, value: 310 },
-  { id: 'raguel',    name: 'Raguel',    emoji: '⚖', hp: 340, value: 340 },
+  { id: 'raguel',    name: 'Raguel',    emoji: '⚡', hp: 340, value: 340 },
   { id: 'sariel',    name: 'Sariel',    emoji: '🌙', hp: 360, value: 370 },
   { id: 'raziel',    name: 'Raziel',    emoji: '📖', hp: 380, value: 400 },
 ];
+// Les Archanges soignent/ressuscitent sur une large zone (mécanique en Phase 2 ;
+// la zone est déjà affichée). auraR plus grand que celui des anges.
 for (const a of ARCHANGELS)
-  TARGET_TYPES['arch_' + a.id] = { name: a.name, emoji: a.emoji, hp: a.hp, value: a.value, living: true, archangel: a.id };
+  TARGET_TYPES['arch_' + a.id] = { name: a.name, emoji: a.emoji, hp: a.hp, value: a.value, living: true, archangel: a.id, heals: true, auraR: 2.5 };
 
 /* -------- Les 7 démons primordiaux en boss de dizaine (Enfers) --------
  * On réutilise les péchés/emblèmes des PRIMORDIAL_DEMONS existants comme boss
