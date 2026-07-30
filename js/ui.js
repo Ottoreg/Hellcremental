@@ -65,6 +65,17 @@ class UI {
       this.game.devSkipLevels(10);
       this.refresh();
     });
+    // [DEV/TEST] Cycler le monde de test : Normal → Cieux → Enfers, en
+    // redémarrant une partie fraîche au niveau 1 dans ce monde.
+    this.$('world-btn').addEventListener('click', () => {
+      this.$('start-screen').classList.add('hidden');
+      this.$('overlay').classList.add('hidden'); // ferme un éventuel écran de fin
+      this._resultWasWorldEnd = false;
+      this.tryLockLandscape();
+      this.setView('game');
+      this.game.devCycleWorld();
+      this.refresh();
+    });
 
     // --- Boutique Démoniaque (Prestige) ---
     this.$('prestige-btn').addEventListener('click', () => this.openPrestige());

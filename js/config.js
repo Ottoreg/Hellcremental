@@ -57,7 +57,9 @@ const TARGET_TYPES = {
   tour:       { name: 'Tour',         emoji: '🗼', hp: 300, value: 88, living: false },
 
   // Prêtre : prie pour exorciser le démon plus vite (draine sa durée de vie).
-  pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true  },
+  // priestLike : unité hostile qui accélère l'exorcisme (drain). Sert de base
+  // générique aux « exorcistes » de chaque monde (prêtre, ange…).
+  pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true, priestLike: true },
 
   // Boss (tous les 10 niveaux) : bien plus grands et coriaces.
   boss_cathedrale: { name: 'Grande Cathédrale', emoji: '⛪', hp: 220, value: 140, living: false },
@@ -867,3 +869,130 @@ const STAT_ROWS = [
   { group: 'Serviteurs & Pouvoirs', key: 'powerDmg',      label: 'Dégâts des pouvoirs', type: 'pct', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'foudreDmg',     label: 'Dégâts de la Foudre', type: 'pct', hideIfZero: true },
 ];
+
+/* =========================================================================
+ * MONDES — Campagnes thématiques (Phase 1 : fondation)
+ * -------------------------------------------------------------------------
+ * Le jeu se décline en trois « mondes » qui partagent EXACTEMENT la même
+ * courbe de difficulté (PV/valeur/densité dérivés du numéro de niveau dans le
+ * monde), mais changent le thème visuel, les cibles, les boss de dizaine et
+ * l'unité hostile qui gêne le démon.
+ *   - normal : la campagne d'origine (campagne → métropole, Vertus, prêtres).
+ *   - cieux  : voie du Blasphème — détruire les Cieux (Archanges, anges).
+ *   - enfers : voie de la Trahison — détruire les Enfers (démons primordiaux,
+ *              démons mineurs).
+ * ========================================================================= */
+
+/* -------- Cibles célestes (monde des Cieux) -------- */
+Object.assign(TARGET_TYPES, {
+  nuee:        { name: 'Nuée',            emoji: '☁️', hp: 9,   value: 3,  living: false },
+  astre:       { name: 'Astre',          emoji: '⭐', hp: 14,  value: 6,  living: false },
+  colombe:     { name: 'Colombe',        emoji: '🕊️', hp: 12,  value: 9,  living: true  },
+  benitier:    { name: 'Bénitier',       emoji: '⛲', hp: 60,  value: 16, living: false },
+  cloche:      { name: 'Cloche sacrée',  emoji: '🔔', hp: 78,  value: 22, living: false },
+  orgue:       { name: 'Grand Orgue',    emoji: '🎹', hp: 100, value: 30, living: false },
+  temple:      { name: 'Temple de nacre',emoji: '🏛️', hp: 150, value: 44, living: false },
+  sanctuaire:  { name: 'Sanctuaire',     emoji: '🛕', hp: 210, value: 62, living: false },
+  elu:         { name: 'Bienheureux',    emoji: '🧑', hp: 18,  value: 15, living: true  },
+  seraphinlt:  { name: 'Petit séraphin', emoji: '👼', hp: 26,  value: 20, living: true  },
+  // Ange : exorciste céleste (remplace le prêtre dans les Cieux).
+  ange:        { name: 'Ange gardien',   emoji: '😇', hp: 24,  value: 22, living: true, priestLike: true },
+});
+
+/* -------- Cibles infernales (monde des Enfers) -------- */
+Object.assign(TARGET_TYPES, {
+  brasier:     { name: 'Brasier',        emoji: '🔥', hp: 10,  value: 4,  living: false },
+  ossuaire:    { name: 'Ossuaire',       emoji: '🦴', hp: 40,  value: 12, living: false },
+  tombe:       { name: 'Pierre tombale', emoji: '🪦', hp: 52,  value: 14, living: false },
+  gibet:       { name: 'Gibet',          emoji: '⛓️', hp: 58,  value: 15, living: false },
+  chaudron:    { name: 'Chaudron',       emoji: '🍲', hp: 72,  value: 20, living: false },
+  volcan:      { name: 'Cône de lave',   emoji: '🌋', hp: 120, value: 34, living: false },
+  porte:       { name: 'Porte damnée',   emoji: '🚪', hp: 150, value: 44, living: false },
+  tour_noire:  { name: 'Tour noire',     emoji: '🏯', hp: 220, value: 64, living: false },
+  ame_damnee:  { name: 'Âme damnée',     emoji: '👻', hp: 15,  value: 9,  living: true  },
+  suppliciee:  { name: 'Suppliciée',     emoji: '🧎', hp: 20,  value: 14, living: true  },
+  // Démon mineur : hostile des Enfers. Contrairement aux exorcistes, il
+  // n'accélère PAS l'exorcisme (pas de drain) — ses vraies attaques (harceler
+  // les serviteurs, brider la magie) arriveront en Phase 2.
+  demon_mineur:{ name: 'Démon mineur',   emoji: '👺', hp: 22,  value: 18, living: true, hostile: true },
+});
+
+/* -------- Les 7 Archanges (boss de dizaine des Cieux) -------- */
+const ARCHANGELS = [
+  { id: 'michel',    name: 'Michel',    emoji: '⚔️', hp: 260, value: 220 },
+  { id: 'gabriel',   name: 'Gabriel',   emoji: '📯', hp: 280, value: 250 },
+  { id: 'raphael',   name: 'Raphaël',   emoji: '🌿', hp: 300, value: 280 },
+  { id: 'uriel',     name: 'Uriel',     emoji: '🔥', hp: 320, value: 310 },
+  { id: 'raguel',    name: 'Raguel',    emoji: '⚖', hp: 340, value: 340 },
+  { id: 'sariel',    name: 'Sariel',    emoji: '🌙', hp: 360, value: 370 },
+  { id: 'raziel',    name: 'Raziel',    emoji: '📖', hp: 380, value: 400 },
+];
+for (const a of ARCHANGELS)
+  TARGET_TYPES['arch_' + a.id] = { name: a.name, emoji: a.emoji, hp: a.hp, value: a.value, living: true, archangel: a.id };
+
+/* -------- Les 7 démons primordiaux en boss de dizaine (Enfers) --------
+ * On réutilise les péchés/emblèmes des PRIMORDIAL_DEMONS existants comme boss
+ * du monde infernal (les trahir revient à détruire les Enfers). */
+const DEMON_BOSSES = PRIMORDIAL_DEMONS.map((d, i) => ({
+  id: d.id, name: d.name, emoji: d.emoji, hp: 250 + i * 22, value: 210 + i * 30,
+}));
+for (const d of DEMON_BOSSES)
+  TARGET_TYPES['pdemon_' + d.id] = { name: d.name, emoji: d.emoji, hp: d.hp, value: d.value, living: true, pdemon: d.id };
+
+/* -------- Biomes célestes -------- */
+const CIEUX_BIOMES = [
+  { id: 'parvis',     name: 'Parvis des Nuées',   ground: ['#8fa6d6', '#a7bce8'],
+    pool: { nuee: 6, astre: 3, colombe: 3, benitier: 1 } },
+  { id: 'jardin',     name: 'Jardin d\'Éden',      ground: ['#7fb08a', '#95c79f'],
+    pool: { colombe: 3, nuee: 3, astre: 2, cloche: 1, benitier: 2, elu: 2 } },
+  { id: 'cloitre',    name: 'Cloître Céleste',     ground: ['#b9a9d8', '#cbbde6'],
+    pool: { cloche: 2, orgue: 1, elu: 3, colombe: 2, benitier: 2, astre: 2 } },
+  { id: 'basilique',  name: 'Basilique de Lumière',ground: ['#c9b6e0', '#dccbee'],
+    pool: { temple: 2, orgue: 2, cloche: 2, elu: 3, seraphinlt: 1, astre: 2 } },
+  { id: 'choeurs',    name: 'Chœurs Angéliques',   ground: ['#a9c0e8', '#c0d3f2'],
+    pool: { seraphinlt: 3, temple: 2, sanctuaire: 1, elu: 2, orgue: 1, colombe: 2 } },
+  { id: 'firmament',  name: 'Haut Firmament',      ground: ['#8ea9e6', '#a6bef0'],
+    pool: { sanctuaire: 2, temple: 2, seraphinlt: 3, astre: 3, orgue: 1, elu: 2 } },
+  { id: 'empyree',    name: 'Empyrée',             ground: ['#d8cff0', '#eae2fb'],
+    pool: { sanctuaire: 3, temple: 2, seraphinlt: 3, elu: 2, orgue: 2, astre: 2 } },
+];
+
+/* -------- Biomes infernaux -------- */
+const ENFERS_BIOMES = [
+  { id: 'seuil',      name: 'Seuil des Enfers',    ground: ['#4a2624', '#5c2f2b'],
+    pool: { brasier: 5, ossuaire: 3, ame_damnee: 3, tombe: 1 } },
+  { id: 'charnier',   name: 'Charnier',            ground: ['#3f2422', '#512b28'],
+    pool: { ossuaire: 3, tombe: 3, ame_damnee: 3, gibet: 2, brasier: 2 } },
+  { id: 'gehenne',    name: 'Géhenne',             ground: ['#5a2a1f', '#6d3324'],
+    pool: { gibet: 2, chaudron: 2, suppliciee: 3, ame_damnee: 2, brasier: 2, tombe: 1 } },
+  { id: 'forges',     name: 'Forges Damnées',      ground: ['#4d2620', '#633025'],
+    pool: { chaudron: 2, volcan: 2, gibet: 2, suppliciee: 3, ossuaire: 2, brasier: 2 } },
+  { id: 'styx',       name: 'Rives du Styx',       ground: ['#33262f', '#412f3a'],
+    pool: { porte: 2, chaudron: 2, ame_damnee: 3, suppliciee: 2, volcan: 1, gibet: 2 } },
+  { id: 'abysses',    name: 'Abysses',             ground: ['#2c1f2b', '#3a2837'],
+    pool: { tour_noire: 1, porte: 2, volcan: 2, suppliciee: 3, chaudron: 2, ame_damnee: 2 } },
+  { id: 'cocyte',     name: 'Cocyte',              ground: ['#241d2e', '#31273f'],
+    pool: { tour_noire: 3, porte: 2, volcan: 2, suppliciee: 3, chaudron: 1, ame_damnee: 2 } },
+];
+
+/* -------- Table des mondes -------- */
+const WORLDS = {
+  normal: {
+    id: 'normal', name: 'Monde normal', emoji: '🗺️',
+    biomes: BIOMES, bosses: null,            // null → logique Vertus/BOSS_POOL historique
+    hostileId: 'pretre', seedOffset: 0,
+  },
+  cieux: {
+    id: 'cieux', name: 'Les Cieux', emoji: '☁️',
+    biomes: CIEUX_BIOMES,
+    bosses: ARCHANGELS.map(a => 'arch_' + a.id),   // boss de dizaine 10→70
+    hostileId: 'ange', seedOffset: 1000003,
+  },
+  enfers: {
+    id: 'enfers', name: 'Les Enfers', emoji: '🔥',
+    biomes: ENFERS_BIOMES,
+    bosses: DEMON_BOSSES.map(d => 'pdemon_' + d.id),
+    hostileId: 'demon_mineur', seedOffset: 2000003,
+  },
+};
+const WORLD_ORDER = ['normal', 'cieux', 'enfers'];

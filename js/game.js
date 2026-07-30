@@ -37,6 +37,11 @@ class Game {
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
+    // Monde courant : 'normal' (campagne d'origine) | 'cieux' | 'enfers'.
+    // Détermine le thème, les cibles, les boss de dizaine et l'unité hostile.
+    // La courbe de difficulté reste identique quel que soit le monde.
+    this.world = 'normal';
+
     // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
     // { stage, total } quand active, sinon null.
     this.worldEnd = null;
@@ -87,6 +92,7 @@ class Game {
     const obj = {
       version: SAVE_VERSION,
       seed: this.seed,
+      world: this.world,
       souls: this.souls,
       level: this.level,
       upgrades: this.upgrades,
@@ -154,6 +160,7 @@ class Game {
   applySaveData(d) {
     if (!d) return false;
     this.seed = (typeof d.seed === 'number') ? d.seed : makeSeed();
+    this.world = WORLDS[d.world] ? d.world : 'normal';
     this.souls = d.souls || 0;
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
@@ -194,6 +201,7 @@ class Game {
   reset() {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
+    this.world = 'normal';
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
@@ -310,6 +318,27 @@ class Game {
     this.save();
   }
 
+  /* [DEV/TEST] Démarre une partie fraîche au niveau 1 dans le monde choisi
+   * (normal / cieux / enfers), à difficulté normale, pour tester chaque monde
+   * indépendamment. Outil temporaire. */
+  devStartWorld(world) {
+    if (!WORLDS[world]) return;
+    this.world = world;
+    this.level = 1;
+    this.worldEnd = null;
+    this.pendingRun = null;
+    this.phase = 'idle';
+    this.startRun();
+  }
+
+  /* Monde de test suivant dans le cycle normal → cieux → enfers. */
+  devCycleWorld() {
+    const i = WORLD_ORDER.indexOf(this.world);
+    const next = WORLD_ORDER[(i + 1) % WORLD_ORDER.length];
+    this.devStartWorld(next);
+    return next;
+  }
+
   /* Prestige : remet la progression à zéro et octroie 1 point de prestige.
    * Conserve les points/améliorations de prestige et les records. */
   doPrestige() {
@@ -336,6 +365,7 @@ class Game {
     });
     this.cycleRavagesStart = this.totalDestroyed;
     // Remise à zéro de la progression (les mensonges en cours sont annulés).
+    this.world = 'normal';   // le prestige ramène toujours dans le monde normal
     this.souls = 0;
     this.level = 1;
     this.upgrades = {};
@@ -706,9 +736,42 @@ class Game {
     return s;
   }
 
+  /* ---------------------- Mondes ---------------------- */
+  worldDef() { return WORLDS[this.world] || WORLDS.normal; }
+  /* Graine décalée par monde : deux mondes au même niveau ne produisent pas la
+   * même disposition. */
+  worldSeed() { return this.seed + this.worldDef().seedOffset; }
+
+  /* Type de l'unité hostile du monde courant (prêtre / ange / démon mineur). */
+  hostileId() { return this.worldDef().hostileId; }
+
+  /* Identifiant du boss de dizaine pour un niveau donné (selon le monde).
+   * Renvoie null si ce niveau n'est pas un niveau de boss. */
+  bossIdForLevel(level, opts, rand) {
+    if (!(opts && opts.forceBoss) && !isBossLevel(level)) return null;
+    // Cieux / Enfers : roster de boss propre au monde (Archanges / démons).
+    const roster = this.worldDef().bosses;
+    if (roster) {
+      const tier = Math.round(level / 10);
+      if (tier >= 1 && tier <= roster.length) return roster[tier - 1];
+      return roster[Math.floor(rand() * roster.length)];
+    }
+    // Monde normal : Vertu de la dizaine, sinon boss générique.
+    const v = opts && opts.forceVirtueId
+      ? VIRTUES.find((x) => x.id === opts.forceVirtueId)
+      : virtueForLevel(level);
+    return v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
+  }
+
   /* ---------------------- Génération de niveau ---------------------- */
-  /* Biome d'un niveau (déterministe par graine au-delà du niveau 70). */
-  biomeFor(level) { return biomeForLevel(level, this.seed); }
+  /* Biome d'un niveau. Monde normal : logique d'origine (zones fixes 1→70 puis
+   * aléatoire). Cieux/Enfers : 7 biomes de 10 niveaux chacun (bornés). */
+  biomeFor(level) {
+    if (this.world === 'normal') return biomeForLevel(level, this.seed);
+    const biomes = this.worldDef().biomes;
+    const idx = Math.min(biomes.length - 1, Math.max(0, Math.ceil(level / 10) - 1));
+    return biomes[idx];
+  }
   currentBiome() { return this.biome || this.biomeFor(this.level); }
   /* Taille de grille : croissance lente (une case toutes les ~6 niveaux). */
   gridSizeFor(level) {
@@ -723,20 +786,22 @@ class Game {
     const biome = this.biomeFor(level);
     const pool = this.buildWeightedPool(biome.pool);
     let hpMult = 1 + (level - 1) * 0.35;
-    // Au-delà du niveau 70 (et donc aussi en Fin du Monde, générée à des
-    // niveaux effectifs > 70) : les PV sont nettement renforcés — ×2 au
-    // niveau 71, puis progressivement davantage — car le démon est devenu
-    // bien trop puissant pour une montée de PV linéaire.
-    if (level > 70) hpMult *= 2 + (level - 71) * 0.1;
+    // Au-delà du niveau 70 (Fin du Monde, générée à des niveaux effectifs > 70) :
+    // les PV sont nettement renforcés — ×2 au niveau 71, puis progressivement
+    // davantage. RÉSERVÉ au monde normal : les campagnes Cieux/Enfers repartent
+    // d'une progression 1→70 fraîche et n'héritent PAS de ce bonus.
+    if (level > 70 && this.world === 'normal') hpMult *= 2 + (level - 71) * 0.1;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
-    const nPriests = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
+    const hostileId = this.hostileId();
+    const nHostiles = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
 
     // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
     // de cibles — le résultat reste identique sur tous les appareils.
+    const wSeed = this.worldSeed();
     for (let attempt = 0; attempt < 12; attempt++) {
-      const rand = seededRandom(this.seed, level, attempt);
+      const rand = seededRandom(wSeed, level, attempt);
       const size = this.gridSizeFor(level);
       const used = new Set();
       const targets = [];
@@ -747,22 +812,20 @@ class Game {
         used.add(x + ',' + y);
       };
 
-      // Boss au centre (tous les 10 niveaux). Aux dizaines 10→70 c'est une
-      // des 7 Vertus ; au-delà, on retombe sur les boss génériques.
+      // Boss au centre (tous les 10 niveaux) : Vertu / Archange / démon
+      // primordial selon le monde (voir bossIdForLevel).
       if (boss) {
-        const v = opts.forceVirtueId
-          ? VIRTUES.find((x) => x.id === opts.forceVirtueId)
-          : virtueForLevel(level);
-        const bid = v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
-        push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
+        const bid = this.bossIdForLevel(level, opts, rand);
+        if (bid) push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
       }
 
-      // Prêtres sur des cases libres.
+      // Unités hostiles du monde (prêtres / anges / démons mineurs) sur des
+      // cases libres.
       let placed = 0, guard = 0;
-      while (placed < nPriests && guard++ < size * size * 3) {
+      while (placed < nHostiles && guard++ < size * size * 3) {
         const x = Math.floor(rand() * size), y = Math.floor(rand() * size);
         if ((x <= 1 && y <= 1) || used.has(x + ',' + y)) continue;
-        push(x, y, 'pretre', 1.3, 1);
+        push(x, y, hostileId, 1.3, 1);
         placed++;
       }
 
@@ -801,10 +864,15 @@ class Game {
       if (this.grid[y] && this.grid[y][x]) this.grid[y][x].scorched = true;
 
     this.targets = rawTargets.map(t => {
-      const priest = t.typeId === 'pretre';
-      const boss = typeof t.typeId === 'string' && (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_'));
+      const def = TARGET_TYPES[t.typeId];
+      // « priest-like » : unité qui exorcise (prêtre, ange). Draine la survie et
+      // reste cible prioritaire des serviteurs traqueurs / du vol de Léviathan.
+      const priest = !!(def && def.priestLike);
+      const boss = typeof t.typeId === 'string' &&
+        (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_') ||
+         t.typeId.startsWith('arch_') || t.typeId.startsWith('pdemon_'));
       return {
-        gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
+        gx: t.gx, gy: t.gy, typeId: t.typeId, def,
         hp: t.hp, maxHp: t.maxHp, value: t.value,
         priest, drain: priest ? PRIEST_DRAIN : 0,
         boss, scale: boss ? BOSS_SCALE : 1,
