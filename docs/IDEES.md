@@ -54,6 +54,26 @@ actifs propres au thème :
 - Les Archanges (méga-boss) étaient déjà notés comme le grand morceau manquant
   du bout de boucle — cet embranchement les intègre côté « Blasphème ».
 
+## Outillage de test : sélecteur de monde de départ
+
+Pour tester l'endgame sans avoir à tout rejouer, prévoir un **mode de test** (dev)
+qui laisse **choisir par quel monde on démarre** :
+- **Monde normal** (campagne de base)
+- **Cieux** (voie du Blasphème)
+- **Enfers** (voie de la Trahison)
+
+**Contrainte importante :** la **courbe de difficulté reste identique** pour ces
+niveaux quel que soit le monde de départ. Autrement dit, le niveau N a la même
+difficulté de base (PV, densité, etc.) qu'on commence par le monde normal, les
+Cieux ou les Enfers — seuls le thème, les ennemis et les boss changent, pas le
+scaling. Démarrer directement dans les Cieux ne doit pas hériter du bonus de PV
+post-70 : chaque campagne se recompte comme sa propre progression 1→70.
+
+**À prévoir techniquement :**
+- Découpler le **thème/monde** du **numéro de difficulté** dans la génération de
+  niveau (aujourd'hui `hpMult`/`valMult`/biome dérivent tous du même `level`).
+- Un bouton dev (comme 💰 / ⏭️) ou un petit menu de choix au démarrage en mode test.
+
 ## Rappel : maillon manquant existant
 - Les **Archanges méga-boss** évoqués dès la conception initiale du prestige
   (« incarner un primordial pour affronter les Archanges ») n'ont jamais été
