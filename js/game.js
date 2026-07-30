@@ -41,6 +41,8 @@ class Game {
     // Détermine le thème, les cibles, les boss de dizaine et l'unité hostile.
     // La courbe de difficulté reste identique quel que soit le monde.
     this.world = 'normal';
+    this.worldEndWins = 0;     // nombre de Fin du Monde remportées (déclenche le choix)
+    this.campaignsWon = {};    // campagnes d'endgame terminées : { cieux, enfers }
 
     // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
     // { stage, total } quand active, sinon null.
@@ -93,6 +95,8 @@ class Game {
       version: SAVE_VERSION,
       seed: this.seed,
       world: this.world,
+      worldEndWins: this.worldEndWins,
+      campaignsWon: this.campaignsWon,
       souls: this.souls,
       level: this.level,
       upgrades: this.upgrades,
@@ -161,6 +165,8 @@ class Game {
     if (!d) return false;
     this.seed = (typeof d.seed === 'number') ? d.seed : makeSeed();
     this.world = WORLDS[d.world] ? d.world : 'normal';
+    this.worldEndWins = d.worldEndWins || 0;
+    this.campaignsWon = d.campaignsWon || {};
     this.souls = d.souls || 0;
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
@@ -202,6 +208,7 @@ class Game {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
     this.world = 'normal';
+    this.worldEndWins = 0; this.campaignsWon = {};
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
@@ -800,6 +807,32 @@ class Game {
     // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
     // de cibles — le résultat reste identique sur tous les appareils.
     const wSeed = this.worldSeed();
+
+    // Boss FINAL d'une campagne d'endgame (niveau 71 dans les Cieux/Enfers) :
+    // arène dédiée avec l'Être ultime au centre + quelques gardes hostiles.
+    if (this.world !== 'normal' && level === CAMPAIGN_FINAL_LEVEL) {
+      const size = this.gridSizeFor(level);
+      const cx = Math.floor(size / 2), cy = Math.floor(size / 2);
+      const ultId = this.worldDef().ultimateId;
+      const udef = TARGET_TYPES[ultId];
+      const uhp = Math.ceil(udef.hp * hpMult * ULTIMATE_HP_FACTOR);
+      const targets = [{ gx: cx, gy: cy, typeId: ultId, hp: uhp, maxHp: uhp,
+        value: Math.ceil(udef.value * valMult) }];
+      const rand = seededRandom(wSeed, level, 0);
+      const used = new Set([cx + ',' + cy]);
+      let placed = 0, guard = 0;
+      while (placed < 4 && guard++ < size * size * 3) {
+        const x = Math.floor(rand() * size), y = Math.floor(rand() * size);
+        if ((x <= 1 && y <= 1) || used.has(x + ',' + y)) continue;
+        const def = TARGET_TYPES[hostileId];
+        const hp = Math.ceil(def.hp * hpMult * 1.3);
+        targets.push({ gx: x, gy: y, typeId: hostileId, hp, maxHp: hp,
+          value: Math.ceil(def.value * valMult) });
+        used.add(x + ',' + y); placed++;
+      }
+      return { gridSize: size, targets };
+    }
+
     for (let attempt = 0; attempt < 12; attempt++) {
       const rand = seededRandom(wSeed, level, attempt);
       const size = this.gridSizeFor(level);
@@ -870,7 +903,8 @@ class Game {
       const priest = !!(def && def.priestLike);
       const boss = typeof t.typeId === 'string' &&
         (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_') ||
-         t.typeId.startsWith('arch_') || t.typeId.startsWith('pdemon_'));
+         t.typeId.startsWith('arch_') || t.typeId.startsWith('pdemon_') ||
+         t.typeId.startsWith('ultimate_'));
       return {
         gx: t.gx, gy: t.gy, typeId: t.typeId, def,
         hp: t.hp, maxHp: t.maxHp, value: t.value,
@@ -1212,13 +1246,57 @@ class Game {
   winWorldEnd() {
     this.prestigePoints += WORLDEND_REWARD;
     this.worldEndCyclePoints += WORLDEND_REWARD; // comptabilisé dans le récap du cycle
+    this.worldEndWins = (this.worldEndWins || 0) + 1;
     const result = {
       cleared: true, worldEnd: 'won', prestigeBonus: WORLDEND_REWARD,
       destroyed: this.runDestroyed, total: this.runDestroyed,
       souls: this.runSouls, level: this.level, stages: WORLDEND_STAGES,
+      // Après la 1re victoire, on propose le choix Blasphème / Trahison ; il
+      // reste ensuite accessible depuis l'accueil.
+      endgameChoice: this.worldEndWins === 1,
     };
     this.worldEnd = null;
     this.phase = 'cleared';
+    this.save();
+    this.onChange();
+    this.onEnd(result);
+  }
+
+  /* ---------------------- Campagnes d'endgame (Cieux / Enfers) ---------------------- */
+  /* Le choix Blasphème/Trahison est disponible dès qu'une Fin du Monde est
+   * remportée. */
+  canEndgame() { return (this.worldEndWins || 0) >= 1; }
+
+  /* Lance une campagne d'endgame : 70 niveaux thématiques + boss ultime au 71. */
+  startCampaign(world) {
+    if (!WORLDS[world] || world === 'normal' || !this.canEndgame()) return false;
+    this.world = world;
+    this.level = 1;
+    this.worldEnd = null;
+    this.pendingRun = null;
+    this.phase = 'idle';
+    this.startRun();
+    return true;
+  }
+
+  /* Boss ultime vaincu : victoire de la campagne. Gros gain de prestige, retour
+   * au monde normal (la progression normale a déjà été mise de côté en entrant
+   * dans la campagne). */
+  winCampaign() {
+    const world = this.world;
+    const def = this.worldDef();
+    this.campaignsWon[world] = true;
+    this.prestigePoints += CAMPAIGN_REWARD;
+    const result = {
+      cleared: true, campaignWon: world,
+      campaignName: def.campaign, ultimateName: (TARGET_TYPES[def.ultimateId] || {}).name,
+      prestigeBonus: CAMPAIGN_REWARD, souls: this.runSouls,
+    };
+    this.world = 'normal';
+    this.level = 1;
+    this.phase = 'cleared';
+    this.pendingRun = null;
+    this.computeStats(true);
     this.save();
     this.onChange();
     this.onEnd(result);
@@ -1430,6 +1508,7 @@ class Game {
     // Progression : niveau nettoyé quand plus aucune cible n'est debout.
     if (this.aliveTargetCount() === 0) {
       if (this.worldEnd) this.onWorldEndClear(); // grille suivante / victoire
+      else if (this.world !== 'normal' && this.level === CAMPAIGN_FINAL_LEVEL) this.winCampaign();
       else this.endRun(true);
     }
   }

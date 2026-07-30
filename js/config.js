@@ -970,8 +970,28 @@ for (const a of ARCHANGELS)
 const DEMON_BOSSES = PRIMORDIAL_DEMONS.map((d, i) => ({
   id: d.id, name: d.name, emoji: d.emoji, hp: 250 + i * 22, value: 210 + i * 30,
 }));
+// Mécanique des boss démoniaques : ils harcèlent les serviteurs ET brident la
+// magie (version « boss » du démon mineur). Les Archanges, eux, soignent et
+// ressuscitent (heals) — déjà défini plus haut.
 for (const d of DEMON_BOSSES)
-  TARGET_TYPES['pdemon_' + d.id] = { name: d.name, emoji: d.emoji, hp: d.hp, value: d.value, living: true, pdemon: d.id };
+  TARGET_TYPES['pdemon_' + d.id] = { name: d.name, emoji: d.emoji, hp: d.hp, value: d.value, living: true, pdemon: d.id, attacksServants: true, throttleMagic: true };
+
+/* -------- Boss finaux ultimes (fin d'une campagne d'endgame) -------- */
+// Emojis à codepoint unique (🌞 / 🐉), correctement centrés.
+TARGET_TYPES['ultimate_divin'] = {
+  name: 'Être Divin Ultime', emoji: '🌞', hp: 520, value: 2500, living: true,
+  heals: true, auraR: 3.4, ultimate: 'cieux',
+};
+TARGET_TYPES['ultimate_demoniaque'] = {
+  name: 'Être Démoniaque Ultime', emoji: '🐉', hp: 520, value: 2500, living: true,
+  attacksServants: true, throttleMagic: true, ultimate: 'enfers',
+};
+
+/* Campagne d'endgame : après le niveau 70 (7 boss de dizaine) vient un niveau
+ * final (71) où trône le boss ultime. Le vaincre = victoire de la campagne. */
+const CAMPAIGN_FINAL_LEVEL = 71;
+const CAMPAIGN_REWARD = 20;       // points de prestige à la victoire d'une campagne
+const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
 
 /* -------- Biomes célestes -------- */
 const CIEUX_BIOMES = [
@@ -1018,15 +1038,17 @@ const WORLDS = {
   },
   cieux: {
     id: 'cieux', name: 'Les Cieux', emoji: '☁️',
+    campaign: 'Blasphème Suprême',
     biomes: CIEUX_BIOMES,
     bosses: ARCHANGELS.map(a => 'arch_' + a.id),   // boss de dizaine 10→70
-    hostileId: 'ange', seedOffset: 1000003,
+    hostileId: 'ange', ultimateId: 'ultimate_divin', seedOffset: 1000003,
   },
   enfers: {
     id: 'enfers', name: 'Les Enfers', emoji: '🔥',
+    campaign: 'Trahison Suprême',
     biomes: ENFERS_BIOMES,
     bosses: DEMON_BOSSES.map(d => 'pdemon_' + d.id),
-    hostileId: 'demon_mineur', seedOffset: 2000003,
+    hostileId: 'demon_mineur', ultimateId: 'ultimate_demoniaque', seedOffset: 2000003,
   },
 };
 const WORLD_ORDER = ['normal', 'cieux', 'enfers'];
