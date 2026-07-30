@@ -886,6 +886,7 @@ class Game {
     this.particles = [];
     this.floaters = [];
     this.bolts = [];
+    this.hostileBolts = [];   // faisceaux d'attaque des démons mineurs (Enfers)
     this.impacts = [];
     this.fires = [];
     this.fireCooldown = 0;
@@ -1257,7 +1258,29 @@ class Game {
       a.gx = Math.random() * (g - 1); a.gy = Math.random() * (g - 1);
       a.cooldown = Math.random(); // décalage initial
     }
+    // PV des serviteurs (Phase 2) : le démon est invulnérable. Les PV montent
+    // avec le niveau pour rester pertinents face aux hostiles des Enfers.
+    if (!isDemon && SERVANT_HP[kind]) {
+      const hp = Math.round(SERVANT_HP[kind] * (1 + (this.level - 1) * 0.18));
+      a.maxHp = hp; a.hp = hp;
+    }
     return a;
+  }
+
+  /* Un serviteur tombe (tué par un hostile) : retiré pour le niveau en cours,
+   * réinvoqué au niveau suivant via buildRunState. */
+  killServant(a) {
+    const i = this.attackers.indexOf(a);
+    if (i > 0) this.attackers.splice(i, 1); // jamais l'indice 0 (le démon)
+    const w = Iso.toScreen(a.gx, a.gy);
+    for (let k = 0; k < 12; k++) {
+      const ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 80;
+      this.particles.push({
+        x: w.x, y: w.y - 14, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 30,
+        g: 140, life: 0.4 + Math.random() * 0.3, color: '#c94b4b', size: 2 + Math.random() * 2,
+      });
+    }
+    this.addFloater(a.gx, a.gy, '✖', '#ff6b6b');
   }
 
   /* ---------------------- Boucle de mise à jour ---------------------- */
@@ -1278,9 +1301,11 @@ class Game {
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
     this.throttledSave(dt); // persiste régulièrement la partie en cours
 
-    // Recharge des sorts actifs.
+    // Recharge des sorts actifs. Les démons mineurs (Enfers) brident la magie :
+    // la recharge s'écoule plus lentement tant qu'ils sont en vie.
+    const cdRate = this.magicThrottle();
     for (const k in this.abilityCooldowns)
-      if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt);
+      if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt * cdRate);
 
     // Furie de clic (Damnation Finale) : décompte des 10 s.
     if (this.clickBuff > 0) this.clickBuff = Math.max(0, this.clickBuff - dt);
@@ -1383,6 +1408,9 @@ class Game {
     // Arc Éternel : arc permanent entre foudroyeurs qui brûle les cases traversées.
     this.updateFoudroyeurArc(dt, s);
     this.updateHyperEffects(dt, s);
+    // Unités hostiles (Phase 2) : démons mineurs attaquent les serviteurs,
+    // anges/archanges soignent et ressuscitent dans leur zone.
+    this.updateHostiles(dt, s);
 
     // Réapparition (niveaux 31+) : les entités vivantes abattues reviennent
     // après un délai si le niveau n'est pas encore nettoyé.
@@ -1434,6 +1462,100 @@ class Game {
         t.hp -= dps * dt;
         if (t.hp <= 0) this.destroyTarget(t);
       }
+    }
+  }
+
+  /* Facteur de recharge des sorts : ralenti par les démons mineurs vivants
+   * (Enfers). 1 = normal ; <1 = recharge plus lente. */
+  magicThrottle() {
+    let n = 0;
+    for (const t of this.targets) if (!t.dead && t.def && t.def.throttleMagic) n++;
+    if (!n) return 1;
+    return Math.max(HOSTILE_TUNING.magicThrottleMin, 1 / (1 + HOSTILE_TUNING.magicThrottlePer * n));
+  }
+
+  /* Petites étincelles de soin au-dessus d'une entité soignée. */
+  spawnHealSpark(o) {
+    const w = Iso.toScreen(o.gx, o.gy);
+    for (let i = 0; i < 4; i++) {
+      const ang = Math.random() * Math.PI * 2, sp = 15 + Math.random() * 30;
+      this.particles.push({
+        x: w.x, y: w.y - 12, vx: Math.cos(ang) * sp, vy: -25 - Math.random() * 25,
+        g: 60, life: 0.4 + Math.random() * 0.3, color: Math.random() < 0.5 ? '#bff5c0' : '#ffe9a6',
+        size: 1.5 + Math.random() * 1.5,
+      });
+    }
+  }
+
+  /* AI des unités hostiles (Phase 2).
+   *  - Démons mineurs (Enfers) : frappent le serviteur vivant le plus proche
+   *    dans leur portée ; un serviteur à 0 PV tombe pour le niveau.
+   *  - Anges & Archanges (Cieux) : soignent les entités de leur zone par
+   *    vagues, et ressuscitent de temps en temps une entité vivante abattue. */
+  updateHostiles(dt, s) {
+    const T = HOSTILE_TUNING;
+    const servants = this.attackers.filter(a => !a.isDemon && a.hp != null);
+    for (const t of this.targets) {
+      if (t.dead || !t.def) continue;
+
+      // --- Démon mineur : attaque un serviteur ---
+      if (t.def.attacksServants && servants.length) {
+        if (t.atkCd == null) t.atkCd = Math.random() * T.demonAtkInterval;
+        t.atkCd -= dt;
+        if (t.atkCd <= 0) {
+          t.atkCd = T.demonAtkInterval;
+          let best = null, bd = T.demonAtkRange;
+          for (const a of servants) {
+            if (a.hp == null || a.hp <= 0) continue;
+            const d = Math.hypot(a.gx - t.gx, a.gy - t.gy);
+            if (d <= bd) { bd = d; best = a; }
+          }
+          if (best) {
+            const dmg = T.demonAtkBaseDmg * (1 + (this.level - 1) * 0.15);
+            best.hp -= dmg;
+            this.hostileBolts.push({ ax: t.gx, ay: t.gy, bx: best.gx, by: best.gy, life: 0.25 });
+            t.lunge = 1;
+            if (best.hp <= 0) this.killServant(best);
+          }
+        }
+      }
+
+      // --- Ange / Archange : soin + résurrection ---
+      if (t.def.heals) {
+        const R = t.def.auraR || 1.6;
+        if (t.healCd == null) t.healCd = Math.random() * T.healInterval;
+        t.healCd -= dt;
+        if (t.healCd <= 0) {
+          t.healCd = T.healInterval;
+          let healed = 0;
+          for (const o of this.targets) {
+            if (o.dead || o === t || o.hp >= o.maxHp) continue;
+            if (Math.hypot(o.gx - t.gx, o.gy - t.gy) <= R) {
+              o.hp = Math.min(o.maxHp, o.hp + o.maxHp * T.healFrac);
+              this.spawnHealSpark(o); healed++;
+            }
+          }
+          if (healed) this.addFloater(t.gx, t.gy, '✚', '#bff5c0');
+        }
+        if (t.resCd == null) t.resCd = Math.random() * T.resurrectInterval;
+        t.resCd -= dt;
+        if (t.resCd <= 0) {
+          t.resCd = T.resurrectInterval;
+          let cand = null, cd = R;
+          for (const o of this.targets) {
+            if (!o.dead || !(o.def && o.def.living) || o.boss || o.priest || o.def.hostile) continue;
+            const d = Math.hypot(o.gx - t.gx, o.gy - t.gy);
+            if (d <= cd) { cd = d; cand = o; }
+          }
+          if (cand) { this.reviveTarget(cand, T.resurrectHpFrac); this.addFloater(t.gx, t.gy, '☩', '#ffe9a6'); }
+        }
+      }
+    }
+
+    // Expiration des faisceaux d'attaque hostiles.
+    for (let i = this.hostileBolts.length - 1; i >= 0; i--) {
+      this.hostileBolts[i].life -= dt;
+      if (this.hostileBolts[i].life <= 0) this.hostileBolts.splice(i, 1);
     }
   }
 
@@ -1739,10 +1861,11 @@ class Game {
     for (const t of this.targets) if (!t.dead) n++;
     return n;
   }
-  /* Ramène une entité vivante à la vie (réapparition). */
-  reviveTarget(t) {
+  /* Ramène une entité vivante à la vie (réapparition, ou résurrection par un
+   * ange avec `frac` < 1 de ses PV max). */
+  reviveTarget(t, frac = 1) {
     t.dead = false; t.deathT = 0; t.respawnT = 0;
-    t.hp = t.maxHp; t.shake = 0; t.bob = Math.random() * Math.PI * 2;
+    t.hp = Math.max(1, Math.round(t.maxHp * frac)); t.shake = 0; t.bob = Math.random() * Math.PI * 2;
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) this.grid[t.gy][t.gx].occupied = true;
     this.addFloater(t.gx, t.gy, '↻', '#9be89b');
     const w = this.worldOf(t);
@@ -2102,6 +2225,24 @@ class Game {
     }
     ctx.globalAlpha = 1;
 
+    // --- Faisceaux d'attaque des démons mineurs (Enfers) sur les serviteurs ---
+    for (const hb of this.hostileBolts) {
+      const wa = Iso.toScreen(hb.ax, hb.ay);
+      const wb = Iso.toScreen(hb.bx, hb.by);
+      const pa = cam.worldToScreen(wa.x, wa.y);
+      const pb = cam.worldToScreen(wb.x, wb.y);
+      ctx.globalAlpha = Math.max(0, Math.min(1, hb.life * 4));
+      ctx.strokeStyle = '#ff5c4a';
+      ctx.lineWidth = 2.4 * cam.scale;
+      ctx.shadowColor = '#b01020'; ctx.shadowBlur = 12 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y - 16 * cam.scale);
+      ctx.lineTo(pb.x, pb.y - 14 * cam.scale);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
     // --- Arc permanent entre foudroyeurs (trait Foudroyeur) ---
     const drawArc = (arc, stroke, glow) => {
       const wa = Iso.toScreen(arc.ax, arc.ay);
@@ -2337,5 +2478,16 @@ class Game {
     ctx.font = `${Math.round(cfg.esize * scale)}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(cfg.emoji, cx, cy);
+
+    // Barre de PV du serviteur (Phase 2) : affichée seulement s'il est blessé.
+    if (a.hp != null && a.maxHp && a.hp < a.maxHp) {
+      const bw = 24 * scale, bh = 4 * scale;
+      const bx = cx - bw / 2, by = cy - R - 8 * scale;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx, by, bw, bh);
+      const frac = Math.max(0, a.hp / a.maxHp);
+      ctx.fillStyle = frac > 0.5 ? '#7bd47b' : frac > 0.25 ? '#ffcc4d' : '#ff5c5c';
+      ctx.fillRect(bx, by, bw * frac, bh);
+    }
   }
 }

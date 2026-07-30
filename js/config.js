@@ -917,10 +917,36 @@ Object.assign(TARGET_TYPES, {
   ame_damnee:  { name: 'Âme damnée',     emoji: '👻', hp: 15,  value: 9,  living: true  },
   suppliciee:  { name: 'Suppliciée',     emoji: '🧎', hp: 20,  value: 14, living: true  },
   // Démon mineur : hostile des Enfers. Contrairement aux exorcistes, il
-  // n'accélère PAS l'exorcisme (pas de drain) — ses vraies attaques (harceler
-  // les serviteurs, brider la magie) arriveront en Phase 2.
-  demon_mineur:{ name: 'Démon mineur',   emoji: '👺', hp: 22,  value: 18, living: true, hostile: true },
+  // n'accélère PAS l'exorcisme (pas de drain). À la place il harcèle les
+  // serviteurs (attacksServants) et bride la magie (throttleMagic : allonge les
+  // recharges des sorts tant qu'il est en vie).
+  demon_mineur:{ name: 'Démon mineur',   emoji: '👺', hp: 22,  value: 18, living: true, hostile: true, attacksServants: true, throttleMagic: true },
 });
+
+/* -------- Réglages des unités hostiles (Phase 2) -------- */
+const HOSTILE_TUNING = {
+  // Démons mineurs (Enfers)
+  demonAtkInterval: 2.0,     // secondes entre deux attaques sur un serviteur
+  demonAtkBaseDmg: 9,        // dégâts de base d'une attaque (scale avec le niveau)
+  demonAtkRange: 3.2,        // portée (en cases) pour cibler un serviteur
+  magicThrottlePer: 0.22,    // +22 % de temps de recharge par démon mineur vivant
+  magicThrottleMin: 0.4,     // recharge jamais ralentie sous 40 % de la vitesse
+  // Anges & Archanges (Cieux)
+  healInterval: 2.2,         // secondes entre deux vagues de soin
+  healFrac: 0.14,            // soigne 14 % des PV max des entités dans la zone
+  resurrectInterval: 5.0,    // secondes entre deux résurrections
+  resurrectHpFrac: 0.6,      // PV rendus à une entité ressuscitée (fraction du max)
+};
+
+/* PV de base des serviteurs (Phase 2). Le démon lui-même est invulnérable
+ * (aucune entrée = pas de PV). Ces PV ne comptent que là où des hostiles les
+ * attaquent (Enfers) ; ailleurs ils restent au maximum. */
+const SERVANT_HP = {
+  minion: 40,
+  demolisher: 220,
+  vagabond: 80,
+  stormling: 60,
+};
 
 /* -------- Les 7 Archanges (boss de dizaine des Cieux) -------- */
 // Emojis à codepoint unique (⚔️ et ⚖ à VS16 se décentraient) → 🔱 et ⚡.
