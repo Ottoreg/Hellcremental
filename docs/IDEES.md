@@ -24,6 +24,30 @@ Chaque voie ouvre **une nouvelle campagne de 70 niveaux**, thématisée selon le
 - Boss tous les 10 niveaux : les **démons primordiaux** (les 7 péchés).
 - Après avoir vaincu les 7 démons → affronter **l'Être démoniaque ultime** (boss final infernal).
 
+### Unités hostiles thématiques (remplacent les prêtres exorcistes)
+Dans la campagne principale, les **prêtres** accélèrent l'exorcisme (drainent la
+survie). Dans chaque campagne d'endgame, ce rôle est remplacé par des ennemis
+actifs propres au thème :
+
+**Cieux — les Anges** (voie du Blasphème) :
+- **Exorcisent le joueur** (comme les prêtres : drainent la durée de vie).
+- **Soignent régulièrement** les entités proches (rendent des PV aux cibles autour).
+- **Ressuscitent de temps en temps** les entités vivantes détruites à proximité.
+
+**Enfers — les Démons mineurs** (voie de la Trahison) :
+- **Attaquent les serviteurs** du joueur : les serviteurs reçoivent désormais des
+  **PV** et peuvent être **tués pour le niveau en cours** (réinvoqués au niveau suivant).
+- **Brident les pouvoirs magiques** : **augmentent les cooldowns** des sorts actifs
+  (Foudre, Météore, Flammes Noires…).
+
+**Impacts techniques à prévoir :**
+- Ajouter une **barre/pool de PV aux serviteurs** (esprits, colosse, vagabonds,
+  foudroyeurs) — aujourd'hui ils sont invulnérables. Nécessaire pour les Enfers.
+- Système d'**entités hostiles mobiles** qui ciblent le joueur/serviteurs, distinct
+  des cibles destructibles passives actuelles.
+- Effets de **soin / résurrection** côté cibles (Anges) et de **malus de cooldown**
+  côté pouvoirs (Démons mineurs).
+
 **Notes ouvertes à trancher plus tard :**
 - Le choix est-il verrouillé à vie, ou reversible à chaque cycle / prestige ?
 - Faut-il rejouer la Fin du Monde à chaque fois pour re-choisir, ou l'accès reste-t-il ouvert ?
