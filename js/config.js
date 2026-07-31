@@ -57,7 +57,9 @@ const TARGET_TYPES = {
   tour:       { name: 'Tour',         emoji: '🗼', hp: 300, value: 88, living: false },
 
   // Prêtre : prie pour exorciser le démon plus vite (draine sa durée de vie).
-  pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true  },
+  // priestLike : unité hostile qui accélère l'exorcisme (drain). Sert de base
+  // générique aux « exorcistes » de chaque monde (prêtre, ange…).
+  pretre:     { name: 'Prêtre',       emoji: '🧎', hp: 18,  value: 16, living: true, priestLike: true },
 
   // Boss (tous les 10 niveaux) : bien plus grands et coriaces.
   boss_cathedrale: { name: 'Grande Cathédrale', emoji: '⛪', hp: 220, value: 140, living: false },
@@ -867,3 +869,186 @@ const STAT_ROWS = [
   { group: 'Serviteurs & Pouvoirs', key: 'powerDmg',      label: 'Dégâts des pouvoirs', type: 'pct', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'foudreDmg',     label: 'Dégâts de la Foudre', type: 'pct', hideIfZero: true },
 ];
+
+/* =========================================================================
+ * MONDES — Campagnes thématiques (Phase 1 : fondation)
+ * -------------------------------------------------------------------------
+ * Le jeu se décline en trois « mondes » qui partagent EXACTEMENT la même
+ * courbe de difficulté (PV/valeur/densité dérivés du numéro de niveau dans le
+ * monde), mais changent le thème visuel, les cibles, les boss de dizaine et
+ * l'unité hostile qui gêne le démon.
+ *   - normal : la campagne d'origine (campagne → métropole, Vertus, prêtres).
+ *   - cieux  : voie du Blasphème — détruire les Cieux (Archanges, anges).
+ *   - enfers : voie de la Trahison — détruire les Enfers (démons primordiaux,
+ *              démons mineurs).
+ * ========================================================================= */
+
+/* -------- Cibles célestes (monde des Cieux) -------- */
+// NB : emojis à codepoint unique (pas de sélecteur VS16 U+FE0F) — les séquences
+// VS16 comme ☁️/🕊️/🏛️/⚔️ se décentrent hors de leur case sur certains
+// navigateurs. On leur préfère des emojis « présentation emoji par défaut ».
+Object.assign(TARGET_TYPES, {
+  nuee:        { name: 'Nuée',            emoji: '⛅', hp: 9,   value: 3,  living: false },
+  astre:       { name: 'Astre',          emoji: '⭐', hp: 14,  value: 6,  living: false },
+  colombe:     { name: 'Colombe',        emoji: '🐦', hp: 12,  value: 9,  living: true  },
+  benitier:    { name: 'Bénitier',       emoji: '⛲', hp: 60,  value: 16, living: false },
+  cloche:      { name: 'Cloche sacrée',  emoji: '🔔', hp: 78,  value: 22, living: false },
+  orgue:       { name: 'Grand Orgue',    emoji: '🎹', hp: 100, value: 30, living: false },
+  temple:      { name: 'Temple de nacre',emoji: '⛪', hp: 150, value: 44, living: false },
+  sanctuaire:  { name: 'Sanctuaire',     emoji: '🛕', hp: 210, value: 62, living: false },
+  elu:         { name: 'Bienheureux',    emoji: '🧑', hp: 18,  value: 15, living: true  },
+  seraphinlt:  { name: 'Petit séraphin', emoji: '👼', hp: 26,  value: 20, living: true  },
+  // Ange : exorciste céleste (remplace le prêtre dans les Cieux). `heals`
+  // marque une aura de soin/résurrection (mécanique en Phase 2 ; zone déjà
+  // affichée). `auraR` = rayon de la zone en cases.
+  ange:        { name: 'Ange gardien',   emoji: '😇', hp: 24,  value: 22, living: true, priestLike: true, heals: true, auraR: 1.6 },
+});
+
+/* -------- Cibles infernales (monde des Enfers) -------- */
+Object.assign(TARGET_TYPES, {
+  brasier:     { name: 'Brasier',        emoji: '🔥', hp: 10,  value: 4,  living: false },
+  ossuaire:    { name: 'Ossuaire',       emoji: '🦴', hp: 40,  value: 12, living: false },
+  tombe:       { name: 'Pierre tombale', emoji: '🪦', hp: 52,  value: 14, living: false },
+  gibet:       { name: 'Gibet',          emoji: '🔗', hp: 58,  value: 15, living: false },
+  chaudron:    { name: 'Chaudron',       emoji: '🍲', hp: 72,  value: 20, living: false },
+  volcan:      { name: 'Cône de lave',   emoji: '🌋', hp: 120, value: 34, living: false },
+  porte:       { name: 'Porte damnée',   emoji: '🚪', hp: 150, value: 44, living: false },
+  tour_noire:  { name: 'Tour noire',     emoji: '🏯', hp: 220, value: 64, living: false },
+  ame_damnee:  { name: 'Âme damnée',     emoji: '👻', hp: 15,  value: 9,  living: true  },
+  suppliciee:  { name: 'Suppliciée',     emoji: '🧎', hp: 20,  value: 14, living: true  },
+  // Démon mineur : hostile des Enfers. Contrairement aux exorcistes, il
+  // n'accélère PAS l'exorcisme (pas de drain). À la place il harcèle les
+  // serviteurs (attacksServants) et bride la magie (throttleMagic : allonge les
+  // recharges des sorts tant qu'il est en vie).
+  demon_mineur:{ name: 'Démon mineur',   emoji: '👺', hp: 22,  value: 18, living: true, hostile: true, attacksServants: true, throttleMagic: true },
+});
+
+/* -------- Réglages des unités hostiles (Phase 2) -------- */
+const HOSTILE_TUNING = {
+  // Démons mineurs (Enfers)
+  demonAtkInterval: 2.0,     // secondes entre deux attaques sur un serviteur
+  demonAtkBaseDmg: 9,        // dégâts de base d'une attaque (scale avec le niveau)
+  demonAtkRange: 3.2,        // portée (en cases) pour cibler un serviteur
+  magicThrottlePer: 0.22,    // +22 % de temps de recharge par démon mineur vivant
+  magicThrottleMin: 0.4,     // recharge jamais ralentie sous 40 % de la vitesse
+  // Anges & Archanges (Cieux)
+  healInterval: 2.2,         // secondes entre deux vagues de soin
+  healFrac: 0.14,            // soigne 14 % des PV max des entités dans la zone
+  resurrectInterval: 5.0,    // secondes entre deux résurrections
+  resurrectHpFrac: 0.6,      // PV rendus à une entité ressuscitée (fraction du max)
+};
+
+/* PV de base des serviteurs (Phase 2). Le démon lui-même est invulnérable
+ * (aucune entrée = pas de PV). Ces PV ne comptent que là où des hostiles les
+ * attaquent (Enfers) ; ailleurs ils restent au maximum. */
+const SERVANT_HP = {
+  minion: 40,
+  demolisher: 220,
+  vagabond: 80,
+  stormling: 60,
+};
+
+/* -------- Les 7 Archanges (boss de dizaine des Cieux) -------- */
+// Emojis à codepoint unique (⚔️ et ⚖ à VS16 se décentraient) → 🔱 et ⚡.
+const ARCHANGELS = [
+  { id: 'michel',    name: 'Michel',    emoji: '🔱', hp: 260, value: 220 },
+  { id: 'gabriel',   name: 'Gabriel',   emoji: '📯', hp: 280, value: 250 },
+  { id: 'raphael',   name: 'Raphaël',   emoji: '🌿', hp: 300, value: 280 },
+  { id: 'uriel',     name: 'Uriel',     emoji: '🔥', hp: 320, value: 310 },
+  { id: 'raguel',    name: 'Raguel',    emoji: '⚡', hp: 340, value: 340 },
+  { id: 'sariel',    name: 'Sariel',    emoji: '🌙', hp: 360, value: 370 },
+  { id: 'raziel',    name: 'Raziel',    emoji: '📖', hp: 380, value: 400 },
+];
+// Les Archanges soignent/ressuscitent sur une large zone (mécanique en Phase 2 ;
+// la zone est déjà affichée). auraR plus grand que celui des anges.
+for (const a of ARCHANGELS)
+  TARGET_TYPES['arch_' + a.id] = { name: a.name, emoji: a.emoji, hp: a.hp, value: a.value, living: true, archangel: a.id, heals: true, auraR: 2.5 };
+
+/* -------- Les 7 démons primordiaux en boss de dizaine (Enfers) --------
+ * On réutilise les péchés/emblèmes des PRIMORDIAL_DEMONS existants comme boss
+ * du monde infernal (les trahir revient à détruire les Enfers). */
+const DEMON_BOSSES = PRIMORDIAL_DEMONS.map((d, i) => ({
+  id: d.id, name: d.name, emoji: d.emoji, hp: 250 + i * 22, value: 210 + i * 30,
+}));
+// Mécanique des boss démoniaques : ils harcèlent les serviteurs ET brident la
+// magie (version « boss » du démon mineur). Les Archanges, eux, soignent et
+// ressuscitent (heals) — déjà défini plus haut.
+for (const d of DEMON_BOSSES)
+  TARGET_TYPES['pdemon_' + d.id] = { name: d.name, emoji: d.emoji, hp: d.hp, value: d.value, living: true, pdemon: d.id, attacksServants: true, throttleMagic: true };
+
+/* -------- Boss finaux ultimes (fin d'une campagne d'endgame) -------- */
+// Emojis à codepoint unique (🌞 / 🐉), correctement centrés.
+TARGET_TYPES['ultimate_divin'] = {
+  name: 'Être Divin Ultime', emoji: '🌞', hp: 520, value: 2500, living: true,
+  heals: true, auraR: 3.4, ultimate: 'cieux',
+};
+TARGET_TYPES['ultimate_demoniaque'] = {
+  name: 'Être Démoniaque Ultime', emoji: '🐉', hp: 520, value: 2500, living: true,
+  attacksServants: true, throttleMagic: true, ultimate: 'enfers',
+};
+
+/* Campagne d'endgame : après le niveau 70 (7 boss de dizaine) vient un niveau
+ * final (71) où trône le boss ultime. Le vaincre = victoire de la campagne. */
+const CAMPAIGN_FINAL_LEVEL = 71;
+const CAMPAIGN_REWARD = 20;       // points de prestige à la victoire d'une campagne
+const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
+
+/* -------- Biomes célestes -------- */
+const CIEUX_BIOMES = [
+  { id: 'parvis',     name: 'Parvis des Nuées',   ground: ['#8fa6d6', '#a7bce8'],
+    pool: { nuee: 6, astre: 3, colombe: 3, benitier: 1 } },
+  { id: 'jardin',     name: 'Jardin d\'Éden',      ground: ['#7fb08a', '#95c79f'],
+    pool: { colombe: 3, nuee: 3, astre: 2, cloche: 1, benitier: 2, elu: 2 } },
+  { id: 'cloitre',    name: 'Cloître Céleste',     ground: ['#b9a9d8', '#cbbde6'],
+    pool: { cloche: 2, orgue: 1, elu: 3, colombe: 2, benitier: 2, astre: 2 } },
+  { id: 'basilique',  name: 'Basilique de Lumière',ground: ['#c9b6e0', '#dccbee'],
+    pool: { temple: 2, orgue: 2, cloche: 2, elu: 3, seraphinlt: 1, astre: 2 } },
+  { id: 'choeurs',    name: 'Chœurs Angéliques',   ground: ['#a9c0e8', '#c0d3f2'],
+    pool: { seraphinlt: 3, temple: 2, sanctuaire: 1, elu: 2, orgue: 1, colombe: 2 } },
+  { id: 'firmament',  name: 'Haut Firmament',      ground: ['#8ea9e6', '#a6bef0'],
+    pool: { sanctuaire: 2, temple: 2, seraphinlt: 3, astre: 3, orgue: 1, elu: 2 } },
+  { id: 'empyree',    name: 'Empyrée',             ground: ['#d8cff0', '#eae2fb'],
+    pool: { sanctuaire: 3, temple: 2, seraphinlt: 3, elu: 2, orgue: 2, astre: 2 } },
+];
+
+/* -------- Biomes infernaux -------- */
+const ENFERS_BIOMES = [
+  { id: 'seuil',      name: 'Seuil des Enfers',    ground: ['#4a2624', '#5c2f2b'],
+    pool: { brasier: 5, ossuaire: 3, ame_damnee: 3, tombe: 1 } },
+  { id: 'charnier',   name: 'Charnier',            ground: ['#3f2422', '#512b28'],
+    pool: { ossuaire: 3, tombe: 3, ame_damnee: 3, gibet: 2, brasier: 2 } },
+  { id: 'gehenne',    name: 'Géhenne',             ground: ['#5a2a1f', '#6d3324'],
+    pool: { gibet: 2, chaudron: 2, suppliciee: 3, ame_damnee: 2, brasier: 2, tombe: 1 } },
+  { id: 'forges',     name: 'Forges Damnées',      ground: ['#4d2620', '#633025'],
+    pool: { chaudron: 2, volcan: 2, gibet: 2, suppliciee: 3, ossuaire: 2, brasier: 2 } },
+  { id: 'styx',       name: 'Rives du Styx',       ground: ['#33262f', '#412f3a'],
+    pool: { porte: 2, chaudron: 2, ame_damnee: 3, suppliciee: 2, volcan: 1, gibet: 2 } },
+  { id: 'abysses',    name: 'Abysses',             ground: ['#2c1f2b', '#3a2837'],
+    pool: { tour_noire: 1, porte: 2, volcan: 2, suppliciee: 3, chaudron: 2, ame_damnee: 2 } },
+  { id: 'cocyte',     name: 'Cocyte',              ground: ['#241d2e', '#31273f'],
+    pool: { tour_noire: 3, porte: 2, volcan: 2, suppliciee: 3, chaudron: 1, ame_damnee: 2 } },
+];
+
+/* -------- Table des mondes -------- */
+const WORLDS = {
+  normal: {
+    id: 'normal', name: 'Monde normal', emoji: '🗺️',
+    biomes: BIOMES, bosses: null,            // null → logique Vertus/BOSS_POOL historique
+    hostileId: 'pretre', seedOffset: 0,
+  },
+  cieux: {
+    id: 'cieux', name: 'Les Cieux', emoji: '☁️',
+    campaign: 'Blasphème Suprême',
+    biomes: CIEUX_BIOMES,
+    bosses: ARCHANGELS.map(a => 'arch_' + a.id),   // boss de dizaine 10→70
+    hostileId: 'ange', ultimateId: 'ultimate_divin', seedOffset: 1000003,
+  },
+  enfers: {
+    id: 'enfers', name: 'Les Enfers', emoji: '🔥',
+    campaign: 'Trahison Suprême',
+    biomes: ENFERS_BIOMES,
+    bosses: DEMON_BOSSES.map(d => 'pdemon_' + d.id),
+    hostileId: 'demon_mineur', ultimateId: 'ultimate_demoniaque', seedOffset: 2000003,
+  },
+};
+const WORLD_ORDER = ['normal', 'cieux', 'enfers'];

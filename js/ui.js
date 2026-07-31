@@ -44,9 +44,11 @@ class UI {
     // Vue de fin (côté Chaos) : relancer / niveau suivant.
     this.$('overlay-btn').addEventListener('click', () => {
       this.$('overlay').classList.add('hidden');
-      // Après une Fin du Monde (gagnée ou perdue), retour à l'accueil.
-      if (this._resultWasWorldEnd) { this._resultWasWorldEnd = false; this.showStartScreen(); }
-      else this.startRun();
+      // Après une Fin du Monde ou une victoire de campagne, retour à l'accueil.
+      if (this._resultWasWorldEnd || this._resultWasCampaign) {
+        this._resultWasWorldEnd = false; this._resultWasCampaign = false;
+        this.showStartScreen();
+      } else this.startRun();
     });
     // Aller améliorer ses pouvoirs (mobile) sans fermer la vue de fin :
     // elle réapparaît en revenant sur Chaos.
@@ -63,6 +65,17 @@ class UI {
     // [DEV/TEST] Passer 10 niveaux d'un coup (marque les Vertus traversées).
     this.$('skip-btn').addEventListener('click', () => {
       this.game.devSkipLevels(10);
+      this.refresh();
+    });
+    // [DEV/TEST] Cycler le monde de test : Normal → Cieux → Enfers, en
+    // redémarrant une partie fraîche au niveau 1 dans ce monde.
+    this.$('world-btn').addEventListener('click', () => {
+      this.$('start-screen').classList.add('hidden');
+      this.$('overlay').classList.add('hidden'); // ferme un éventuel écran de fin
+      this._resultWasWorldEnd = false;
+      this.tryLockLandscape();
+      this.setView('game');
+      this.game.devCycleWorld();
       this.refresh();
     });
 
@@ -163,6 +176,35 @@ class UI {
     this.refresh();
   }
 
+  /* Ajoute les deux boutons de choix Blasphème / Trahison à un conteneur. */
+  appendEndgameChoice(body, first) {
+    const wrap = document.createElement('div');
+    wrap.className = 'ov-endgame';
+    wrap.innerHTML =
+      (first ? `<p class="ov-endgame-lead">✦ Un choix ultime s'ouvre à toi ✦</p>`
+             : `<p class="ov-endgame-lead">Choisis ta croisade ultime</p>`) +
+      `<div class="ov-endgame-btns">
+         <button class="ov-eg-btn eg-cieux" data-world="cieux">☁️ Blasphème Suprême<small>Détruis les Cieux · 7 Archanges → l'Être Divin</small></button>
+         <button class="ov-eg-btn eg-enfers" data-world="enfers">🔥 Trahison Suprême<small>Détruis les Enfers · 7 démons → l'Être Démoniaque</small></button>
+       </div>`;
+    body.appendChild(wrap);
+    wrap.querySelectorAll('.ov-eg-btn').forEach(b =>
+      b.addEventListener('click', () => this.startCampaign(b.dataset.world)));
+  }
+
+  /* Lance une campagne d'endgame (Cieux = Blasphème, Enfers = Trahison). */
+  startCampaign(world) {
+    this.$('start-screen').classList.add('hidden');
+    this.$('prestige-modal').classList.add('hidden');
+    this.$('overlay').classList.add('hidden');
+    this._resultWasWorldEnd = false;
+    this._resultWasCampaign = false;
+    this.tryLockLandscape();
+    this.setView('game');
+    this.game.startCampaign(world);
+    this.refresh();
+  }
+
   showStartScreen() {
     // Propose « Reprendre » si une partie est sauvegardée.
     this.$('resume-btn').classList.toggle('hidden', !this.game.hasResumableRun());
@@ -199,12 +241,24 @@ class UI {
     if (g.canWorldEnd()) {
       worldEnd = `<button id="vt-worldend-btn" class="vt-worldend-btn">🌍 Fin du Monde — les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</button>`;
     }
+    // Campagnes d'endgame : débloquées après une 1re victoire en Fin du Monde.
+    let endgame = '';
+    if (g.canEndgame()) {
+      const c = g.campaignsWon || {};
+      endgame =
+        `<div class="vt-endgame">` +
+        `<button class="vt-eg-btn eg-cieux" data-world="cieux">☁️ Blasphème — Détruire les Cieux${c.cieux ? ' ✓' : ''}</button>` +
+        `<button class="vt-eg-btn eg-enfers" data-world="enfers">🔥 Trahison — Détruire les Enfers${c.enfers ? ' ✓' : ''}</button>` +
+        `</div>`;
+    }
     el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
-      `<div class="vt-pips">${pips}</div>${prestige}${worldEnd}`;
+      `<div class="vt-pips">${pips}</div>${prestige}${worldEnd}${endgame}`;
     const b = el.querySelector('#vt-prestige-btn');
     if (b) b.addEventListener('click', () => this.openPrestige());
     const w = el.querySelector('#vt-worldend-btn');
     if (w) w.addEventListener('click', () => this.startWorldEnd());
+    el.querySelectorAll('.vt-eg-btn').forEach(btn =>
+      btn.addEventListener('click', () => this.startCampaign(btn.dataset.world)));
   }
 
   /* Bascule entre la vue jeu et la vue boutique (mobile). */
@@ -1285,6 +1339,26 @@ class UI {
     this.setView('game');
     const mobile = this.isMobile();
 
+    // --- Victoire d'une campagne d'endgame (boss ultime vaincu) : écran dédié ---
+    if (r.campaignWon) {
+      this._resultWasCampaign = true;
+      const heaven = r.campaignWon === 'cieux';
+      title.textContent = heaven ? '🌞 Les Cieux sont tombés !' : '🐉 Les Enfers sont tombés !';
+      title.className = 'cleared';
+      body.innerHTML = `
+        <p class="ov-lead">Tu as terrassé <b>${r.ultimateName}</b> et anéanti ${heaven ? 'les Cieux' : 'les Enfers'}. <b>${r.campaignName}</b> accompli.</p>
+        <div class="ov-stats">
+          <div><span>💀 ${this.fmt(r.souls)}</span><label>âmes récoltées</label></div>
+          <div><span>+${r.prestigeBonus}</span><label>points de prestige</label></div>
+        </div>
+        <p class="ov-hint">Récompense colossale créditée. Tu reviens dans le monde normal.</p>`;
+      btn.textContent = '🔻 Retour';
+      this.$('overlay-improve').classList.add('hidden');
+      ov.classList.remove('hidden');
+      this.refresh();
+      return;
+    }
+
     // --- Fin du Monde (épreuve d'endurance) : écran dédié ---
     if (r.worldEnd) {
       this._resultWasWorldEnd = true;
@@ -1300,6 +1374,8 @@ class UI {
           </div>
           <p class="ov-hint">Les points sont crédités. Renais quand tu veux dans la Boutique Démoniaque.</p>`;
         btn.textContent = '🔻 Retour';
+        // Choix Blasphème / Trahison : proposé dès la 1re victoire.
+        this.appendEndgameChoice(body, r.endgameChoice);
       } else {
         title.textContent = '✝️ Fin du Monde interrompue';
         title.className = 'exorcised';

@@ -37,6 +37,13 @@ class Game {
     this.totalDestroyed = 0;
     this.bestLevel = 1;
 
+    // Monde courant : 'normal' (campagne d'origine) | 'cieux' | 'enfers'.
+    // Détermine le thème, les cibles, les boss de dizaine et l'unité hostile.
+    // La courbe de difficulté reste identique quel que soit le monde.
+    this.world = 'normal';
+    this.worldEndWins = 0;     // nombre de Fin du Monde remportées (déclenche le choix)
+    this.campaignsWon = {};    // campagnes d'endgame terminées : { cieux, enfers }
+
     // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
     // { stage, total } quand active, sinon null.
     this.worldEnd = null;
@@ -87,6 +94,9 @@ class Game {
     const obj = {
       version: SAVE_VERSION,
       seed: this.seed,
+      world: this.world,
+      worldEndWins: this.worldEndWins,
+      campaignsWon: this.campaignsWon,
       souls: this.souls,
       level: this.level,
       upgrades: this.upgrades,
@@ -154,6 +164,9 @@ class Game {
   applySaveData(d) {
     if (!d) return false;
     this.seed = (typeof d.seed === 'number') ? d.seed : makeSeed();
+    this.world = WORLDS[d.world] ? d.world : 'normal';
+    this.worldEndWins = d.worldEndWins || 0;
+    this.campaignsWon = d.campaignsWon || {};
     this.souls = d.souls || 0;
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
@@ -194,6 +207,8 @@ class Game {
   reset() {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
+    this.world = 'normal';
+    this.worldEndWins = 0; this.campaignsWon = {};
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
@@ -310,6 +325,27 @@ class Game {
     this.save();
   }
 
+  /* [DEV/TEST] Démarre une partie fraîche au niveau 1 dans le monde choisi
+   * (normal / cieux / enfers), à difficulté normale, pour tester chaque monde
+   * indépendamment. Outil temporaire. */
+  devStartWorld(world) {
+    if (!WORLDS[world]) return;
+    this.world = world;
+    this.level = 1;
+    this.worldEnd = null;
+    this.pendingRun = null;
+    this.phase = 'idle';
+    this.startRun();
+  }
+
+  /* Monde de test suivant dans le cycle normal → cieux → enfers. */
+  devCycleWorld() {
+    const i = WORLD_ORDER.indexOf(this.world);
+    const next = WORLD_ORDER[(i + 1) % WORLD_ORDER.length];
+    this.devStartWorld(next);
+    return next;
+  }
+
   /* Prestige : remet la progression à zéro et octroie 1 point de prestige.
    * Conserve les points/améliorations de prestige et les records. */
   doPrestige() {
@@ -336,6 +372,7 @@ class Game {
     });
     this.cycleRavagesStart = this.totalDestroyed;
     // Remise à zéro de la progression (les mensonges en cours sont annulés).
+    this.world = 'normal';   // le prestige ramène toujours dans le monde normal
     this.souls = 0;
     this.level = 1;
     this.upgrades = {};
@@ -706,9 +743,42 @@ class Game {
     return s;
   }
 
+  /* ---------------------- Mondes ---------------------- */
+  worldDef() { return WORLDS[this.world] || WORLDS.normal; }
+  /* Graine décalée par monde : deux mondes au même niveau ne produisent pas la
+   * même disposition. */
+  worldSeed() { return this.seed + this.worldDef().seedOffset; }
+
+  /* Type de l'unité hostile du monde courant (prêtre / ange / démon mineur). */
+  hostileId() { return this.worldDef().hostileId; }
+
+  /* Identifiant du boss de dizaine pour un niveau donné (selon le monde).
+   * Renvoie null si ce niveau n'est pas un niveau de boss. */
+  bossIdForLevel(level, opts, rand) {
+    if (!(opts && opts.forceBoss) && !isBossLevel(level)) return null;
+    // Cieux / Enfers : roster de boss propre au monde (Archanges / démons).
+    const roster = this.worldDef().bosses;
+    if (roster) {
+      const tier = Math.round(level / 10);
+      if (tier >= 1 && tier <= roster.length) return roster[tier - 1];
+      return roster[Math.floor(rand() * roster.length)];
+    }
+    // Monde normal : Vertu de la dizaine, sinon boss générique.
+    const v = opts && opts.forceVirtueId
+      ? VIRTUES.find((x) => x.id === opts.forceVirtueId)
+      : virtueForLevel(level);
+    return v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
+  }
+
   /* ---------------------- Génération de niveau ---------------------- */
-  /* Biome d'un niveau (déterministe par graine au-delà du niveau 70). */
-  biomeFor(level) { return biomeForLevel(level, this.seed); }
+  /* Biome d'un niveau. Monde normal : logique d'origine (zones fixes 1→70 puis
+   * aléatoire). Cieux/Enfers : 7 biomes de 10 niveaux chacun (bornés). */
+  biomeFor(level) {
+    if (this.world === 'normal') return biomeForLevel(level, this.seed);
+    const biomes = this.worldDef().biomes;
+    const idx = Math.min(biomes.length - 1, Math.max(0, Math.ceil(level / 10) - 1));
+    return biomes[idx];
+  }
   currentBiome() { return this.biome || this.biomeFor(this.level); }
   /* Taille de grille : croissance lente (une case toutes les ~6 niveaux). */
   gridSizeFor(level) {
@@ -723,20 +793,48 @@ class Game {
     const biome = this.biomeFor(level);
     const pool = this.buildWeightedPool(biome.pool);
     let hpMult = 1 + (level - 1) * 0.35;
-    // Au-delà du niveau 70 (et donc aussi en Fin du Monde, générée à des
-    // niveaux effectifs > 70) : les PV sont nettement renforcés — ×2 au
-    // niveau 71, puis progressivement davantage — car le démon est devenu
-    // bien trop puissant pour une montée de PV linéaire.
-    if (level > 70) hpMult *= 2 + (level - 71) * 0.1;
+    // Au-delà du niveau 70 (Fin du Monde, générée à des niveaux effectifs > 70) :
+    // les PV sont nettement renforcés — ×2 au niveau 71, puis progressivement
+    // davantage. RÉSERVÉ au monde normal : les campagnes Cieux/Enfers repartent
+    // d'une progression 1→70 fraîche et n'héritent PAS de ce bonus.
+    if (level > 70 && this.world === 'normal') hpMult *= 2 + (level - 71) * 0.1;
     const valMult = 1 + (level - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
-    const nPriests = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
+    const hostileId = this.hostileId();
+    const nHostiles = Math.min(6, Math.floor(level / 4) + (boss ? 2 : 0));
 
     // On tente plusieurs graines dérivées (déterministes) jusqu'à obtenir assez
     // de cibles — le résultat reste identique sur tous les appareils.
+    const wSeed = this.worldSeed();
+
+    // Boss FINAL d'une campagne d'endgame (niveau 71 dans les Cieux/Enfers) :
+    // arène dédiée avec l'Être ultime au centre + quelques gardes hostiles.
+    if (this.world !== 'normal' && level === CAMPAIGN_FINAL_LEVEL) {
+      const size = this.gridSizeFor(level);
+      const cx = Math.floor(size / 2), cy = Math.floor(size / 2);
+      const ultId = this.worldDef().ultimateId;
+      const udef = TARGET_TYPES[ultId];
+      const uhp = Math.ceil(udef.hp * hpMult * ULTIMATE_HP_FACTOR);
+      const targets = [{ gx: cx, gy: cy, typeId: ultId, hp: uhp, maxHp: uhp,
+        value: Math.ceil(udef.value * valMult) }];
+      const rand = seededRandom(wSeed, level, 0);
+      const used = new Set([cx + ',' + cy]);
+      let placed = 0, guard = 0;
+      while (placed < 4 && guard++ < size * size * 3) {
+        const x = Math.floor(rand() * size), y = Math.floor(rand() * size);
+        if ((x <= 1 && y <= 1) || used.has(x + ',' + y)) continue;
+        const def = TARGET_TYPES[hostileId];
+        const hp = Math.ceil(def.hp * hpMult * 1.3);
+        targets.push({ gx: x, gy: y, typeId: hostileId, hp, maxHp: hp,
+          value: Math.ceil(def.value * valMult) });
+        used.add(x + ',' + y); placed++;
+      }
+      return { gridSize: size, targets };
+    }
+
     for (let attempt = 0; attempt < 12; attempt++) {
-      const rand = seededRandom(this.seed, level, attempt);
+      const rand = seededRandom(wSeed, level, attempt);
       const size = this.gridSizeFor(level);
       const used = new Set();
       const targets = [];
@@ -747,22 +845,20 @@ class Game {
         used.add(x + ',' + y);
       };
 
-      // Boss au centre (tous les 10 niveaux). Aux dizaines 10→70 c'est une
-      // des 7 Vertus ; au-delà, on retombe sur les boss génériques.
+      // Boss au centre (tous les 10 niveaux) : Vertu / Archange / démon
+      // primordial selon le monde (voir bossIdForLevel).
       if (boss) {
-        const v = opts.forceVirtueId
-          ? VIRTUES.find((x) => x.id === opts.forceVirtueId)
-          : virtueForLevel(level);
-        const bid = v ? ('virtue_' + v.id) : BOSS_POOL[Math.floor(rand() * BOSS_POOL.length)];
-        push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
+        const bid = this.bossIdForLevel(level, opts, rand);
+        if (bid) push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
       }
 
-      // Prêtres sur des cases libres.
+      // Unités hostiles du monde (prêtres / anges / démons mineurs) sur des
+      // cases libres.
       let placed = 0, guard = 0;
-      while (placed < nPriests && guard++ < size * size * 3) {
+      while (placed < nHostiles && guard++ < size * size * 3) {
         const x = Math.floor(rand() * size), y = Math.floor(rand() * size);
         if ((x <= 1 && y <= 1) || used.has(x + ',' + y)) continue;
-        push(x, y, 'pretre', 1.3, 1);
+        push(x, y, hostileId, 1.3, 1);
         placed++;
       }
 
@@ -801,10 +897,16 @@ class Game {
       if (this.grid[y] && this.grid[y][x]) this.grid[y][x].scorched = true;
 
     this.targets = rawTargets.map(t => {
-      const priest = t.typeId === 'pretre';
-      const boss = typeof t.typeId === 'string' && (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_'));
+      const def = TARGET_TYPES[t.typeId];
+      // « priest-like » : unité qui exorcise (prêtre, ange). Draine la survie et
+      // reste cible prioritaire des serviteurs traqueurs / du vol de Léviathan.
+      const priest = !!(def && def.priestLike);
+      const boss = typeof t.typeId === 'string' &&
+        (t.typeId.startsWith('boss_') || t.typeId.startsWith('virtue_') ||
+         t.typeId.startsWith('arch_') || t.typeId.startsWith('pdemon_') ||
+         t.typeId.startsWith('ultimate_'));
       return {
-        gx: t.gx, gy: t.gy, typeId: t.typeId, def: TARGET_TYPES[t.typeId],
+        gx: t.gx, gy: t.gy, typeId: t.typeId, def,
         hp: t.hp, maxHp: t.maxHp, value: t.value,
         priest, drain: priest ? PRIEST_DRAIN : 0,
         boss, scale: boss ? BOSS_SCALE : 1,
@@ -818,6 +920,7 @@ class Game {
     this.particles = [];
     this.floaters = [];
     this.bolts = [];
+    this.hostileBolts = [];   // faisceaux d'attaque des démons mineurs (Enfers)
     this.impacts = [];
     this.fires = [];
     this.fireCooldown = 0;
@@ -1143,13 +1246,57 @@ class Game {
   winWorldEnd() {
     this.prestigePoints += WORLDEND_REWARD;
     this.worldEndCyclePoints += WORLDEND_REWARD; // comptabilisé dans le récap du cycle
+    this.worldEndWins = (this.worldEndWins || 0) + 1;
     const result = {
       cleared: true, worldEnd: 'won', prestigeBonus: WORLDEND_REWARD,
       destroyed: this.runDestroyed, total: this.runDestroyed,
       souls: this.runSouls, level: this.level, stages: WORLDEND_STAGES,
+      // Après la 1re victoire, on propose le choix Blasphème / Trahison ; il
+      // reste ensuite accessible depuis l'accueil.
+      endgameChoice: this.worldEndWins === 1,
     };
     this.worldEnd = null;
     this.phase = 'cleared';
+    this.save();
+    this.onChange();
+    this.onEnd(result);
+  }
+
+  /* ---------------------- Campagnes d'endgame (Cieux / Enfers) ---------------------- */
+  /* Le choix Blasphème/Trahison est disponible dès qu'une Fin du Monde est
+   * remportée. */
+  canEndgame() { return (this.worldEndWins || 0) >= 1; }
+
+  /* Lance une campagne d'endgame : 70 niveaux thématiques + boss ultime au 71. */
+  startCampaign(world) {
+    if (!WORLDS[world] || world === 'normal' || !this.canEndgame()) return false;
+    this.world = world;
+    this.level = 1;
+    this.worldEnd = null;
+    this.pendingRun = null;
+    this.phase = 'idle';
+    this.startRun();
+    return true;
+  }
+
+  /* Boss ultime vaincu : victoire de la campagne. Gros gain de prestige, retour
+   * au monde normal (la progression normale a déjà été mise de côté en entrant
+   * dans la campagne). */
+  winCampaign() {
+    const world = this.world;
+    const def = this.worldDef();
+    this.campaignsWon[world] = true;
+    this.prestigePoints += CAMPAIGN_REWARD;
+    const result = {
+      cleared: true, campaignWon: world,
+      campaignName: def.campaign, ultimateName: (TARGET_TYPES[def.ultimateId] || {}).name,
+      prestigeBonus: CAMPAIGN_REWARD, souls: this.runSouls,
+    };
+    this.world = 'normal';
+    this.level = 1;
+    this.phase = 'cleared';
+    this.pendingRun = null;
+    this.computeStats(true);
     this.save();
     this.onChange();
     this.onEnd(result);
@@ -1189,7 +1336,29 @@ class Game {
       a.gx = Math.random() * (g - 1); a.gy = Math.random() * (g - 1);
       a.cooldown = Math.random(); // décalage initial
     }
+    // PV des serviteurs (Phase 2) : le démon est invulnérable. Les PV montent
+    // avec le niveau pour rester pertinents face aux hostiles des Enfers.
+    if (!isDemon && SERVANT_HP[kind]) {
+      const hp = Math.round(SERVANT_HP[kind] * (1 + (this.level - 1) * 0.18));
+      a.maxHp = hp; a.hp = hp;
+    }
     return a;
+  }
+
+  /* Un serviteur tombe (tué par un hostile) : retiré pour le niveau en cours,
+   * réinvoqué au niveau suivant via buildRunState. */
+  killServant(a) {
+    const i = this.attackers.indexOf(a);
+    if (i > 0) this.attackers.splice(i, 1); // jamais l'indice 0 (le démon)
+    const w = Iso.toScreen(a.gx, a.gy);
+    for (let k = 0; k < 12; k++) {
+      const ang = Math.random() * Math.PI * 2, sp = 40 + Math.random() * 80;
+      this.particles.push({
+        x: w.x, y: w.y - 14, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 30,
+        g: 140, life: 0.4 + Math.random() * 0.3, color: '#c94b4b', size: 2 + Math.random() * 2,
+      });
+    }
+    this.addFloater(a.gx, a.gy, '✖', '#ff6b6b');
   }
 
   /* ---------------------- Boucle de mise à jour ---------------------- */
@@ -1210,9 +1379,11 @@ class Game {
     if (this.timeLeft <= 0) { this.timeLeft = 0; return this.endRun(false); }
     this.throttledSave(dt); // persiste régulièrement la partie en cours
 
-    // Recharge des sorts actifs.
+    // Recharge des sorts actifs. Les démons mineurs (Enfers) brident la magie :
+    // la recharge s'écoule plus lentement tant qu'ils sont en vie.
+    const cdRate = this.magicThrottle();
     for (const k in this.abilityCooldowns)
-      if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt);
+      if (this.abilityCooldowns[k] > 0) this.abilityCooldowns[k] = Math.max(0, this.abilityCooldowns[k] - dt * cdRate);
 
     // Furie de clic (Damnation Finale) : décompte des 10 s.
     if (this.clickBuff > 0) this.clickBuff = Math.max(0, this.clickBuff - dt);
@@ -1315,6 +1486,9 @@ class Game {
     // Arc Éternel : arc permanent entre foudroyeurs qui brûle les cases traversées.
     this.updateFoudroyeurArc(dt, s);
     this.updateHyperEffects(dt, s);
+    // Unités hostiles (Phase 2) : démons mineurs attaquent les serviteurs,
+    // anges/archanges soignent et ressuscitent dans leur zone.
+    this.updateHostiles(dt, s);
 
     // Réapparition (niveaux 31+) : les entités vivantes abattues reviennent
     // après un délai si le niveau n'est pas encore nettoyé.
@@ -1334,6 +1508,7 @@ class Game {
     // Progression : niveau nettoyé quand plus aucune cible n'est debout.
     if (this.aliveTargetCount() === 0) {
       if (this.worldEnd) this.onWorldEndClear(); // grille suivante / victoire
+      else if (this.world !== 'normal' && this.level === CAMPAIGN_FINAL_LEVEL) this.winCampaign();
       else this.endRun(true);
     }
   }
@@ -1366,6 +1541,100 @@ class Game {
         t.hp -= dps * dt;
         if (t.hp <= 0) this.destroyTarget(t);
       }
+    }
+  }
+
+  /* Facteur de recharge des sorts : ralenti par les démons mineurs vivants
+   * (Enfers). 1 = normal ; <1 = recharge plus lente. */
+  magicThrottle() {
+    let n = 0;
+    for (const t of this.targets) if (!t.dead && t.def && t.def.throttleMagic) n++;
+    if (!n) return 1;
+    return Math.max(HOSTILE_TUNING.magicThrottleMin, 1 / (1 + HOSTILE_TUNING.magicThrottlePer * n));
+  }
+
+  /* Petites étincelles de soin au-dessus d'une entité soignée. */
+  spawnHealSpark(o) {
+    const w = Iso.toScreen(o.gx, o.gy);
+    for (let i = 0; i < 4; i++) {
+      const ang = Math.random() * Math.PI * 2, sp = 15 + Math.random() * 30;
+      this.particles.push({
+        x: w.x, y: w.y - 12, vx: Math.cos(ang) * sp, vy: -25 - Math.random() * 25,
+        g: 60, life: 0.4 + Math.random() * 0.3, color: Math.random() < 0.5 ? '#bff5c0' : '#ffe9a6',
+        size: 1.5 + Math.random() * 1.5,
+      });
+    }
+  }
+
+  /* AI des unités hostiles (Phase 2).
+   *  - Démons mineurs (Enfers) : frappent le serviteur vivant le plus proche
+   *    dans leur portée ; un serviteur à 0 PV tombe pour le niveau.
+   *  - Anges & Archanges (Cieux) : soignent les entités de leur zone par
+   *    vagues, et ressuscitent de temps en temps une entité vivante abattue. */
+  updateHostiles(dt, s) {
+    const T = HOSTILE_TUNING;
+    const servants = this.attackers.filter(a => !a.isDemon && a.hp != null);
+    for (const t of this.targets) {
+      if (t.dead || !t.def) continue;
+
+      // --- Démon mineur : attaque un serviteur ---
+      if (t.def.attacksServants && servants.length) {
+        if (t.atkCd == null) t.atkCd = Math.random() * T.demonAtkInterval;
+        t.atkCd -= dt;
+        if (t.atkCd <= 0) {
+          t.atkCd = T.demonAtkInterval;
+          let best = null, bd = T.demonAtkRange;
+          for (const a of servants) {
+            if (a.hp == null || a.hp <= 0) continue;
+            const d = Math.hypot(a.gx - t.gx, a.gy - t.gy);
+            if (d <= bd) { bd = d; best = a; }
+          }
+          if (best) {
+            const dmg = T.demonAtkBaseDmg * (1 + (this.level - 1) * 0.15);
+            best.hp -= dmg;
+            this.hostileBolts.push({ ax: t.gx, ay: t.gy, bx: best.gx, by: best.gy, life: 0.25 });
+            t.lunge = 1;
+            if (best.hp <= 0) this.killServant(best);
+          }
+        }
+      }
+
+      // --- Ange / Archange : soin + résurrection ---
+      if (t.def.heals) {
+        const R = t.def.auraR || 1.6;
+        if (t.healCd == null) t.healCd = Math.random() * T.healInterval;
+        t.healCd -= dt;
+        if (t.healCd <= 0) {
+          t.healCd = T.healInterval;
+          let healed = 0;
+          for (const o of this.targets) {
+            if (o.dead || o === t || o.hp >= o.maxHp) continue;
+            if (Math.hypot(o.gx - t.gx, o.gy - t.gy) <= R) {
+              o.hp = Math.min(o.maxHp, o.hp + o.maxHp * T.healFrac);
+              this.spawnHealSpark(o); healed++;
+            }
+          }
+          if (healed) this.addFloater(t.gx, t.gy, '✚', '#bff5c0');
+        }
+        if (t.resCd == null) t.resCd = Math.random() * T.resurrectInterval;
+        t.resCd -= dt;
+        if (t.resCd <= 0) {
+          t.resCd = T.resurrectInterval;
+          let cand = null, cd = R;
+          for (const o of this.targets) {
+            if (!o.dead || !(o.def && o.def.living) || o.boss || o.priest || o.def.hostile) continue;
+            const d = Math.hypot(o.gx - t.gx, o.gy - t.gy);
+            if (d <= cd) { cd = d; cand = o; }
+          }
+          if (cand) { this.reviveTarget(cand, T.resurrectHpFrac); this.addFloater(t.gx, t.gy, '☩', '#ffe9a6'); }
+        }
+      }
+    }
+
+    // Expiration des faisceaux d'attaque hostiles.
+    for (let i = this.hostileBolts.length - 1; i >= 0; i--) {
+      this.hostileBolts[i].life -= dt;
+      if (this.hostileBolts[i].life <= 0) this.hostileBolts.splice(i, 1);
     }
   }
 
@@ -1671,10 +1940,11 @@ class Game {
     for (const t of this.targets) if (!t.dead) n++;
     return n;
   }
-  /* Ramène une entité vivante à la vie (réapparition). */
-  reviveTarget(t) {
+  /* Ramène une entité vivante à la vie (réapparition, ou résurrection par un
+   * ange avec `frac` < 1 de ses PV max). */
+  reviveTarget(t, frac = 1) {
     t.dead = false; t.deathT = 0; t.respawnT = 0;
-    t.hp = t.maxHp; t.shake = 0; t.bob = Math.random() * Math.PI * 2;
+    t.hp = Math.max(1, Math.round(t.maxHp * frac)); t.shake = 0; t.bob = Math.random() * Math.PI * 2;
     if (this.grid[t.gy] && this.grid[t.gy][t.gx]) this.grid[t.gy][t.gx].occupied = true;
     this.addFloater(t.gx, t.gy, '↻', '#9be89b');
     const w = this.worldOf(t);
@@ -1969,6 +2239,32 @@ class Game {
       ctx.fill();
     }
 
+    // --- Zone de soin / résurrection des anges & archanges (au sol) ---
+    // Cercle céleste léger montrant le rayon d'action (mécanique en Phase 2).
+    for (const t of this.targets) {
+      if (t.dead || !(t.def && t.def.heals)) continue;
+      const w = Iso.toScreen(t.gx, t.gy);
+      const p = cam.worldToScreen(w.x, w.y);
+      const R = (t.def.auraR || 1.6) * CONFIG.TILE_W * 0.62 * cam.scale;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 420 + t.gx * 1.7 + t.gy);
+      const a = 0.12 + pulse * 0.10;
+      // Halo doux au sol.
+      const grd = ctx.createRadialGradient(p.x, p.y, R * 0.2, p.x, p.y, R);
+      grd.addColorStop(0, `rgba(255,244,190,${a})`);
+      grd.addColorStop(0.7, `rgba(255,232,150,${a * 0.5})`);
+      grd.addColorStop(1, 'rgba(255,232,150,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Anneau fin délimitant la zone.
+      ctx.strokeStyle = `rgba(255,240,175,${0.35 + pulse * 0.2})`;
+      ctx.lineWidth = 1.5 * cam.scale;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R, R * 0.58, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // --- Objets + attaquants triés par profondeur (gx+gy) ---
     const drawList = [];
     for (const t of this.targets) {
@@ -2003,6 +2299,24 @@ class Game {
         const jitter = Math.sin(bolt.seed + i * 2.3) * 16 * cam.scale * (1 - i / segs);
         ctx.lineTo(base.x + jitter, yy);
       }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
+    // --- Faisceaux d'attaque des démons mineurs (Enfers) sur les serviteurs ---
+    for (const hb of this.hostileBolts) {
+      const wa = Iso.toScreen(hb.ax, hb.ay);
+      const wb = Iso.toScreen(hb.bx, hb.by);
+      const pa = cam.worldToScreen(wa.x, wa.y);
+      const pb = cam.worldToScreen(wb.x, wb.y);
+      ctx.globalAlpha = Math.max(0, Math.min(1, hb.life * 4));
+      ctx.strokeStyle = '#ff5c4a';
+      ctx.lineWidth = 2.4 * cam.scale;
+      ctx.shadowColor = '#b01020'; ctx.shadowBlur = 12 * cam.scale;
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y - 16 * cam.scale);
+      ctx.lineTo(pb.x, pb.y - 14 * cam.scale);
       ctx.stroke();
       ctx.shadowBlur = 0;
     }
@@ -2243,5 +2557,16 @@ class Game {
     ctx.font = `${Math.round(cfg.esize * scale)}px serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(cfg.emoji, cx, cy);
+
+    // Barre de PV du serviteur (Phase 2) : affichée seulement s'il est blessé.
+    if (a.hp != null && a.maxHp && a.hp < a.maxHp) {
+      const bw = 24 * scale, bh = 4 * scale;
+      const bx = cx - bw / 2, by = cy - R - 8 * scale;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(bx, by, bw, bh);
+      const frac = Math.max(0, a.hp / a.maxHp);
+      ctx.fillStyle = frac > 0.5 ? '#7bd47b' : frac > 0.25 ? '#ffcc4d' : '#ff5c5c';
+      ctx.fillRect(bx, by, bw * frac, bh);
+    }
   }
 }
