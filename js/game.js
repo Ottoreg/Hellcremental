@@ -832,15 +832,17 @@ class Game {
     // monde normal et grimpe ensuite — la campagne se joue de 1 à 70 (thème,
     // boss, taille de grille sur le niveau affiché) mais devient quasi-infaisable
     // avant 1-2 prestiges.
+    const isCampaign = this.world !== 'normal';
     const campScale = (this.campaignDiffScale != null) ? this.campaignDiffScale : CAMPAIGN_DIFF_SCALE;
-    const diffLevel = (this.world !== 'normal')
+    const diffLevel = isCampaign
       ? WORLDEND_BASE_LEVEL + (level - 1) * campScale
       : level;
     let hpMult = 1 + (diffLevel - 1) * 0.35;
-    // Au-delà du niveau 70 (Fin du Monde à niveaux effectifs > 70, ET campagnes
-    // ancrées au-delà de 70) : PV nettement renforcés — ×2 dès 71, puis
-    // progressivement davantage.
-    if (diffLevel > 70) hpMult *= 2 + (diffLevel - 71) * 0.1;
+    // Boost EXPONENTIEL post-70 : réservé au monde normal endless et à la Fin du
+    // Monde (niveaux effectifs > 70). Les CAMPAGNES en sont exemptées et gardent
+    // une montée LINÉAIRE — l'ancrage au niveau 70 suffit à les durcir, et la
+    // double exponentielle rendait toute campagne infaisable (facteur ×17).
+    if (diffLevel > 70 && !isCampaign) hpMult *= 2 + (diffLevel - 71) * 0.1;
     const valMult = 1 + (diffLevel - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
