@@ -74,6 +74,8 @@ html, body {
 }
 .icon-btn:hover { border-color: var(--ember); transform: translateY(-1px); }
 #install-btn { border-color: #6a4a2a; box-shadow: 0 0 12px rgba(255,120,20,.2); }
+/* Bouton musique actif : liseré ardent + pulsation douce. */
+#music-btn.on { border-color: var(--ember); color: var(--ember-2); box-shadow: 0 0 14px rgba(255,90,20,.45); }
 
 /* ---------------- Zone principale ---------------- */
 #main { flex: 1; display: flex; min-height: 0; }
