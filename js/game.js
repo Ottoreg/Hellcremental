@@ -269,7 +269,14 @@ class Game {
 
   upgradeCost(def) {
     const n = this.upgradeLevel(def.id);
-    return Math.floor(def.baseCost * Math.pow(def.mult, n));
+    let cost = Math.floor(def.baseCost * Math.pow(def.mult, n));
+    // Palier de prix des voies : si d'autres voies sont déjà engagées, celle-ci
+    // coûte plus cher (pertinent uniquement sous le Serment du Chaos / multi-voie).
+    if (n === 0 && VOIE_IDS.includes(def.id)) {
+      const owned = VOIE_IDS.filter((id) => id !== def.id && this.upgradeLevel(id) >= 1).length;
+      if (owned > 0) cost = Math.floor(cost * Math.pow(VOIE_PRICE_TIER, owned));
+    }
+    return cost;
   }
 
   /* ---------------------- Offrandes aux démons primordiaux ---------------------- */
@@ -714,6 +721,9 @@ class Game {
     for (const dmn of PRIMORDIAL_DEMONS) {
       if (this.demonUnlocked(dmn.id)) dmn.apply(s);
     }
+    // (La vitesse de base est plafonnée en amont via le nombre de crans de
+    // « Pattes Véloces » — pas de cap dur ici : prestiges et pactes primordiaux
+    // peuvent la dépasser.)
     // Améliorations permanentes de prestige (conservées à travers les prestiges).
     for (const pu of PRESTIGE_UPGRADES) {
       const pn = this.prestigeUpgradeLevel(pu.id);
@@ -741,6 +751,31 @@ class Game {
       this.timeLeft += Math.max(0, s.lifespan - prevMax);
     }
     return s;
+  }
+
+  /* Estimation du DPS à partir d'un objet de stats (pour le panneau 📊).
+   * Valeurs approchées — l'objectif est de COMPARER ce qui est efficace, pas une
+   * exactitude parfaite (peste et éclairs sont périodiques/continus). */
+  dpsFromStats(s) {
+    const ai = s.attackInterval > 0 ? s.attackInterval : CONFIG.BASE_ATTACK_INTERVAL;
+    const demon = s.damage / ai;
+    const minionEach = s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg);
+    const minions = s.minions * minionEach / ai;
+    const colosse = s.demolisher > 0
+      ? (s.damage * 2 * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg)) / ai : 0;
+    // Peste des vagabonds : dégâts continus (facteur d'occupation de zone ~0,4).
+    const vagabonds = s.vagabond * (s.damage * 2.0 * (1 + s.vagabondDmg) * (1 + s.servantDmg)) * 0.4;
+    // Éclairs des foudroyeurs : cadence approchée (base ~1,6 s, réduite par le pacte).
+    const stormRate = 1 / Math.max(0.5, 1.6 * Math.pow(0.92, s.stormlingRate));
+    const foudroyeurs = s.stormling * (s.damage * 7.5 * (1 + s.stormlingDmg) * (1 + s.servantDmg)) * stormRate;
+    const servants = minions + colosse + vagabonds + foudroyeurs;
+    const spells = [];
+    if (s.foudre > 0) spells.push({ name: 'Foudre (par frappe)',
+      val: Math.round(s.damage * (4 + s.foudre * 1.5) * (1 + s.foudreDmg) * (1 + s.powerDmg)) });
+    if (s.meteore > 0) spells.push({ name: 'Météore (par case)',
+      val: Math.round(s.damage * (8 + s.meteore * 2) * (1 + s.powerDmg)) });
+    if (s.clickUnlocked) spells.push({ name: 'Clic infernal', val: Math.round(s.clickDamage) });
+    return { demon: Math.round(demon), servants: Math.round(servants), spells };
   }
 
   /* ---------------------- Mondes ---------------------- */
@@ -792,13 +827,21 @@ class Game {
   generateLevel(level, opts = {}) {
     const biome = this.biomeFor(level);
     const pool = this.buildWeightedPool(biome.pool);
-    let hpMult = 1 + (level - 1) * 0.35;
-    // Au-delà du niveau 70 (Fin du Monde, générée à des niveaux effectifs > 70) :
-    // les PV sont nettement renforcés — ×2 au niveau 71, puis progressivement
-    // davantage. RÉSERVÉ au monde normal : les campagnes Cieux/Enfers repartent
-    // d'une progression 1→70 fraîche et n'héritent PAS de ce bonus.
-    if (level > 70 && this.world === 'normal') hpMult *= 2 + (level - 71) * 0.1;
-    const valMult = 1 + (level - 1) * 0.28;
+    // Niveau de DIFFICULTÉ effectif. Monde normal : = niveau affiché. Campagnes
+    // d'endgame (Cieux/Enfers) : la difficulté démarre à celle du niveau 70 du
+    // monde normal et grimpe ensuite — la campagne se joue de 1 à 70 (thème,
+    // boss, taille de grille sur le niveau affiché) mais devient quasi-infaisable
+    // avant 1-2 prestiges.
+    const campScale = (this.campaignDiffScale != null) ? this.campaignDiffScale : CAMPAIGN_DIFF_SCALE;
+    const diffLevel = (this.world !== 'normal')
+      ? WORLDEND_BASE_LEVEL + (level - 1) * campScale
+      : level;
+    let hpMult = 1 + (diffLevel - 1) * 0.35;
+    // Au-delà du niveau 70 (Fin du Monde à niveaux effectifs > 70, ET campagnes
+    // ancrées au-delà de 70) : PV nettement renforcés — ×2 dès 71, puis
+    // progressivement davantage.
+    if (diffLevel > 70) hpMult *= 2 + (diffLevel - 71) * 0.1;
+    const valMult = 1 + (diffLevel - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
     const hostileId = this.hostileId();
@@ -846,10 +889,15 @@ class Game {
       };
 
       // Boss au centre (tous les 10 niveaux) : Vertu / Archange / démon
-      // primordial selon le monde (voir bossIdForLevel).
+      // primordial selon le monde (voir bossIdForLevel). Dans le monde normal,
+      // les deux premières dizaines sont adoucies (le joueur est encore faible :
+      // 2-3 échecs visés, pas 5-6).
       if (boss) {
         const bid = this.bossIdForLevel(level, opts, rand);
-        if (bid) push(Math.floor(size / 2), Math.floor(size / 2), bid, BOSS_HP_FACTOR, 3);
+        const tier = Math.round(level / 10);
+        const bossFactor = (this.world === 'normal' && tier <= 2)
+          ? BOSS_HP_FACTOR * 0.7 : BOSS_HP_FACTOR;
+        if (bid) push(Math.floor(size / 2), Math.floor(size / 2), bid, bossFactor, 3);
       }
 
       // Unités hostiles du monde (prêtres / anges / démons mineurs) sur des
@@ -2012,6 +2060,28 @@ class Game {
   }
 
   targetAtScreen(sx, sy) {
+    // 1) Test « à l'icône » : on sélectionne l'icône RÉELLEMENT dessinée sous le
+    //    curseur, la plus au premier plan (plus grand gx+gy = dessinée par-dessus).
+    //    Indispensable pour cliquer les cibles autour d'un gros boss, dont l'emoji
+    //    déborde et masquait les cases voisines avec le seul test « à la case ».
+    const scale = this.cam.scale;
+    let hit = null, hitDepth = -Infinity;
+    for (const t of this.targets) {
+      if (t.dead) continue;
+      const w = Iso.toScreen(t.gx, t.gy);
+      const p = this.cam.worldToScreen(w.x, w.y);
+      const ts = t.scale || 1;
+      const lift = (14 + (ts - 1) * 16) * scale;
+      const iy = p.y - lift;                 // centre vertical de l'emoji
+      const r = 17 * ts * scale;             // rayon cliquable de l'icône
+      if (Math.hypot(sx - p.x, sy - iy) <= r) {
+        const depth = t.gx + t.gy;
+        if (depth > hitDepth) { hitDepth = depth; hit = t; }
+      }
+    }
+    if (hit) return hit;
+
+    // 2) Repli « à la case » (clic sur une case vide → cible occupant cette case).
     const w = this.cam.screenToWorld(sx, sy);
     const g = Iso.toGrid(w.x, w.y);
     const cx = Math.round(g.gx), cy = Math.round(g.gy);

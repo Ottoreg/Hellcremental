@@ -171,8 +171,10 @@ const UPGRADES = [
   },
   {
     id: 'pattes', name: 'Pattes Véloces', emoji: '🦶',
-    desc: 'Se déplace plus vite d\'une victime à l\'autre.',
-    baseCost: 18, mult: 1.38, max: 40,
+    desc: 'Se déplace plus vite d\'une victime à l\'autre. Limité à 9 crans : la ' +
+          'vitesse de base plafonne autour de 7 — au-delà, seuls les prestiges et ' +
+          'pactes primordiaux accélèrent encore.',
+    baseCost: 18, mult: 1.38, max: 9,
     effect: (n) => `+${(0.4 * n).toFixed(1)} vitesse`,
     apply: (s, n) => { s.moveSpeed += 0.4 * n; },
   },
@@ -180,21 +182,21 @@ const UPGRADES = [
   {
     id: 'longevite1', name: 'Longévité Maudite', emoji: '⏳',
     desc: 'Résiste 5 secondes de plus avant d\'être exorcisé.',
-    baseCost: 30, mult: 1, max: 1,
+    baseCost: 90, mult: 1, max: 1,
     effect: () => '+5s de survie',
     apply: (s, n) => { s.lifespan += 5 * n; },
   },
   {
     id: 'longevite2', name: 'Endurance Damnée', emoji: '⌛',
     desc: 'Encore 5 secondes de sursis avant l\'exorcisme.',
-    baseCost: 600, mult: 1, max: 1,
+    baseCost: 3500, mult: 1, max: 1,
     effect: () => '+5s de survie',
     apply: (s, n) => { s.lifespan += 5 * n; },
   },
   {
     id: 'longevite3', name: 'Âme Increvable', emoji: '🕰️',
     desc: 'Un dernier répit de 5 secondes face aux prières.',
-    baseCost: 12000, mult: 1, max: 1,
+    baseCost: 90000, mult: 1, max: 1,
     effect: () => '+5s de survie',
     apply: (s, n) => { s.lifespan += 5 * n; },
   },
@@ -269,8 +271,8 @@ const UPGRADES = [
     id: 'foudre_dmg', name: 'Foudre Dévastatrice', emoji: '🌩️',
     desc: 'Surcharge ta Foudre Infernale : chaque frappe inflige bien plus de dégâts.',
     baseCost: 800, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 30)}% de dégâts de la Foudre`,
-    apply: (s, n) => { s.foudreDmg += 0.3 * n; },
+    effect: (n) => `+${Math.round(n * 20)}% de dégâts de la Foudre`,
+    apply: (s, n) => { s.foudreDmg += 0.2 * n; },
   },
   {
     id: 'pyromancie', name: 'Pyromancie', emoji: '🔥',
@@ -446,8 +448,8 @@ const UPGRADES = [
     id: 'clic_demon', name: 'Poing Démoniaque', emoji: '👊',
     desc: 'Décuple encore les dégâts de ton clic infernal.',
     baseCost: 600, mult: 1.4, max: 40,
-    effect: (n) => `+${20 * n} dégâts au clic`,
-    apply: (s, n) => { s.clickDamage += 20 * n; },
+    effect: (n) => `+${12 * n} dégâts au clic`,
+    apply: (s, n) => { s.clickDamage += 12 * n; },
   },
   {
     id: 'nappe_feu', name: 'Nappe de Feu', emoji: '🌋',
@@ -604,6 +606,12 @@ const ACTIVE_ABILITIES = {
  * Arbre de compétences : position (en coordonnées « monde ») de chaque pouvoir
  * et lien vers son parent. La vue se parcourt librement au drag.
  * ------------------------------------------------------------------------- */
+// Palier de prix des voies : chaque voie DÉJÀ engagée renchérit le coût des
+// suivantes (n'a d'effet qu'avec le Serment du Chaos, qui autorise le multi-voie
+// — objectif : casser le « gros gain de facilité » du multi-voie bon marché).
+const VOIE_IDS = ['voie_magie', 'voie_legion', 'voie_clic'];
+const VOIE_PRICE_TIER = 6;   // 1re voie = prix normal, 2e ×6, 3e ×36
+
 const TREE_W = 1560;
 const TREE_H = 1320;
 const SKILL_TREE = [
@@ -621,7 +629,10 @@ const SKILL_TREE = [
   { id: 'longevite2',  x: 230, y: 545, parent: 'longevite1' },
   { id: 'longevite3',  x: 100, y: 545, parent: 'longevite2' },
   { id: 'recolte',     x: 765, y: 440, parent: 'root' },
-  { id: 'minions',     x: 875, y: 610, parent: 'recolte' },
+  // Serviteurs : désormais RÉSERVÉS à la Voie des Légions (reqVoie). Le premier
+  // pacte de serviteurs (Esprits) exige donc d'avoir engagé la voie ; toute la
+  // chaîne (Colosse, Vagabonds, Foudroyeurs) en dépend par filiation.
+  { id: 'minions',     x: 875, y: 610, parent: 'recolte', reqVoie: 'voie_legion' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
   { id: 'demolisseur', x: 940, y: 770, parent: 'minions', req: 8 },
   // Améliorations dmg/vitesse : réservées à la Voie des Légions (reqVoie).
@@ -656,8 +667,10 @@ const SKILL_TREE = [
   { id: 'meteore_zone',x: 1420, y: 120, parent: 'meteore', req: 1 },
   { id: 'flammes_noires', x: 1290, y: 300, parent: 'pyromancie', req: 1 },
 
-  // Voie des Légions (exclusive) — prolonge la branche des serviteurs.
-  { id: 'voie_legion', x: 690, y: 720, parent: 'minions', req: 1, group: 'voie' },
+  // Voie des Légions (exclusive) — porte d'entrée des serviteurs. Rattachée à
+  // « Récolte » (et non plus à « Esprits ») : il faut engager la voie AVANT de
+  // pouvoir invoquer le moindre serviteur.
+  { id: 'voie_legion', x: 690, y: 720, parent: 'recolte', req: 1, group: 'voie' },
   { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
 
   // Voie du Clic Démoniaque (exclusive) — prolonge la branche du clic.
@@ -992,6 +1005,11 @@ TARGET_TYPES['ultimate_demoniaque'] = {
 const CAMPAIGN_FINAL_LEVEL = 71;
 const CAMPAIGN_REWARD = 20;       // points de prestige à la victoire d'une campagne
 const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
+// Ancrage de difficulté des campagnes (Cieux/Enfers) : la campagne se joue de 1
+// à 70, mais sa DIFFICULTÉ démarre à celle du niveau 70 du monde normal et
+// grimpe ensuite. Objectif : quasi-infaisable avant 1-2 prestiges.
+//   niveau de difficulté effectif = 70 + (niveauCampagne - 1) * CAMPAIGN_DIFF_SCALE
+const CAMPAIGN_DIFF_SCALE = 1.0;
 
 /* -------- Biomes célestes -------- */
 const CIEUX_BIOMES = [

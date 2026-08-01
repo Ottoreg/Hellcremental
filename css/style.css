@@ -942,6 +942,9 @@ html, body {
   background: rgba(12,10,18,.5);
 }
 .stat-row:hover .stat-detail, .stat-row.open .stat-detail { display: block; }
+/* Lignes DPS (bloc en tête) : pas de détail dépliable. */
+.stat-row.no-detail { cursor: default; }
+.stat-row.no-detail .sr-val { color: #ffd27b; }
 .sd-line {
   display: flex; justify-content: space-between; gap: 10px;
   font-size: 12px; color: var(--muted); padding: 3px 0;
