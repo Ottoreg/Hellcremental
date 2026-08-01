@@ -1007,9 +1007,12 @@ const CAMPAIGN_REWARD = 20;       // points de prestige à la victoire d'une cam
 const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
 // Ancrage de difficulté des campagnes (Cieux/Enfers) : la campagne se joue de 1
 // à 70, mais sa DIFFICULTÉ démarre à celle du niveau 70 du monde normal et
-// grimpe ensuite. Objectif : quasi-infaisable avant 1-2 prestiges.
-//   niveau de difficulté effectif = 70 + (niveauCampagne - 1) * CAMPAIGN_DIFF_SCALE
-const CAMPAIGN_DIFF_SCALE = 1.0;
+// grimpe LINÉAIREMENT ensuite (pas de boost exponentiel post-70, réservé au
+// monde normal). Le niveau de difficulté effectif = 70 + (niveau - 1) * SCALE.
+// Valeur calée au simulateur enrichi (build réaliste jouant jusqu'au niv.70 +
+// prestiges) : à 4.0, la campagne est quasi-infaisable à 0-1 prestige (on
+// atteint ~67-69/71) et se gagne à ~2 prestiges. Réglable via g.campaignDiffScale.
+const CAMPAIGN_DIFF_SCALE = 4.0;
 
 /* -------- Biomes célestes -------- */
 const CIEUX_BIOMES = [
