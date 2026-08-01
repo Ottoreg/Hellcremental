@@ -29,6 +29,16 @@ class UI {
   // on considère toujours l'agencement à vue unique + barre d'onglets.
   isMobile() { return true; }
 
+  /* Met à jour l'icône du bouton musique selon l'état. */
+  updateMusicBtn() {
+    const on = HellMusic.isEnabled();
+    const b = this.$('music-btn');
+    if (!b) return;
+    b.textContent = on ? '🔊' : '🎵';
+    b.classList.toggle('on', on);
+    b.title = on ? 'Couper la musique' : 'Musique métal';
+  }
+
   bind() {
     this.$('start-btn').addEventListener('click', () => this.startRun());
     this.$('resume-btn').addEventListener('click', () => this.resumeRun());
@@ -40,6 +50,17 @@ class UI {
     this.bindIntro();
     this.bindTreePan();
     this.bindNodeModal();
+
+    // Musique de fond (métal synthétisé). Bouton bascule + démarrage sur geste.
+    HellMusic.load();
+    this.updateMusicBtn();
+    this.$('music-btn').addEventListener('click', () => {
+      HellMusic.toggle();
+      this.updateMusicBtn();
+    });
+    // Si activée dans une session précédente, redémarre au premier geste
+    // (les navigateurs exigent une interaction pour lancer l'audio).
+    window.addEventListener('pointerdown', () => HellMusic.kick(), { once: true });
 
     // Vue de fin (côté Chaos) : relancer / niveau suivant.
     this.$('overlay-btn').addEventListener('click', () => {
