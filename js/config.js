@@ -112,7 +112,7 @@ function virtueForLevel(level) {
 const WORLDEND_STAGES = VIRTUES.length;   // 7 grilles, une par Vertu
 const WORLDEND_BASE_LEVEL = 70;           // difficulté de base des grilles
 const WORLDEND_STEP = 3;                  // +3 « niveaux » de difficulté par grille
-const WORLDEND_REWARD = 5;                // points de prestige à la victoire
+const WORLDEND_REWARD = 3;                // points de prestige à la victoire
 const WORLDEND_TIME = 60;                 // survie plafonnée à 60 s pour toute l'épreuve
 
 /* -------------------------------------------------------------------------
@@ -476,7 +476,7 @@ const UPGRADES = [
     desc: 'Le souffle de Belial récompense tes tromperies : chaque mensonge ' +
           'tenu rapporte davantage de points de prestige. Un investissement ' +
           'colossal, à financer sur plusieurs damnations.',
-    baseCost: 5000000, mult: 10, max: 2, // 5 M puis 50 M
+    baseCost: 5000000, mult: 14, max: 2, // 5 M puis 70 M (niveau 2 calé pour ~3 prestiges)
     effect: (n) => `Mensonge tenu : +${1 + n} pt${1 + n > 1 ? 's' : ''} de prestige`,
     apply: (s, n) => { s.lieBonus = n; },
   },
@@ -1003,7 +1003,7 @@ TARGET_TYPES['ultimate_demoniaque'] = {
 /* Campagne d'endgame : après le niveau 70 (7 boss de dizaine) vient un niveau
  * final (71) où trône le boss ultime. Le vaincre = victoire de la campagne. */
 const CAMPAIGN_FINAL_LEVEL = 71;
-const CAMPAIGN_REWARD = 20;       // points de prestige à la victoire d'une campagne
+const CAMPAIGN_REWARD = 3;        // points de prestige à la victoire d'une campagne
 const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
 // Ancrage de difficulté des campagnes (Cieux/Enfers) : la campagne se joue de 1
 // à 70, mais sa DIFFICULTÉ démarre à celle du niveau 70 du monde normal et
