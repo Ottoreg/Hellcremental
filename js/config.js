@@ -172,11 +172,11 @@ const UPGRADES = [
   {
     id: 'pattes', name: 'Pattes Véloces', emoji: '🦶',
     desc: 'Se déplace plus vite d\'une victime à l\'autre. Limité à 9 crans : la ' +
-          'vitesse de base plafonne autour de 7 — au-delà, seuls les prestiges et ' +
+          'vitesse de base plafonne autour de 5 — au-delà, seuls les prestiges et ' +
           'pactes primordiaux accélèrent encore.',
-    baseCost: 18, mult: 1.38, max: 9,
-    effect: (n) => `+${(0.4 * n).toFixed(1)} vitesse`,
-    apply: (s, n) => { s.moveSpeed += 0.4 * n; },
+    baseCost: 250, mult: 2.5, max: 9,
+    effect: (n) => `+${(0.2 * n).toFixed(1)} vitesse`,
+    apply: (s, n) => { s.moveSpeed += 0.2 * n; },
   },
   // Longévité : trois pactes uniques de +5 s, chacun 20× plus cher que le précédent.
   {
