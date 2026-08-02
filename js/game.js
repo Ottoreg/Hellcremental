@@ -652,10 +652,32 @@ class Game {
     this.upgrades[id] = n + 1;
     this.everBought[id] = true; // pacte découvert : révélé à jamais
     this.save();
-    // Applique à chaud si une vie est en cours.
-    if (this.phase === 'playing') this.computeStats(false);
+    // Applique à chaud si une vie est en cours, et fait apparaître aussitôt les
+    // serviteurs nouvellement achetés (sinon ils n'existaient qu'au niveau
+    // suivant → ils semblaient ne pas bénéficier des effets, ex. Triumvirat).
+    if (this.phase === 'playing') {
+      const before = this.stats
+        ? { minions: this.stats.minions, demolisher: this.stats.demolisher,
+            vagabond: this.stats.vagabond, stormling: this.stats.stormling }
+        : null;
+      this.computeStats(false);
+      if (before) this.spawnNewServants(before);
+    }
     this.onChange();
     return true;
+  }
+
+  /* Fait apparaître, en cours de niveau, les serviteurs dont le nombre vient
+   * d'augmenter (achat). On ne spawn que le DELTA positif du nombre voulu vs
+   * avant l'achat → ne comble PAS les serviteurs tués (mécanique des Enfers). */
+  spawnNewServants(before) {
+    if (this.phase !== 'playing' || !this.stats) return;
+    const s = this.stats;
+    const add = (kind, k) => { for (let i = 0; i < k; i++) this.attackers.push(this.makeAttacker(kind)); };
+    add('minion', Math.max(0, (s.minions || 0) - (before.minions || 0)));
+    add('vagabond', Math.max(0, (s.vagabond || 0) - (before.vagabond || 0)));
+    add('stormling', Math.max(0, (s.stormling || 0) - (before.stormling || 0)));
+    if ((s.demolisher || 0) > 0 && (before.demolisher || 0) <= 0) add('demolisher', 1);
   }
 
   /* Objet de statistiques « à zéro » (valeurs de base avant tout pacte). */
