@@ -41,7 +41,8 @@ class Game {
     // Détermine le thème, les cibles, les boss de dizaine et l'unité hostile.
     // La courbe de difficulté reste identique quel que soit le monde.
     this.world = 'normal';
-    this.worldEndWins = 0;     // nombre de Fin du Monde remportées (déclenche le choix)
+    this.worldEndWins = 0;     // nombre de Fin du Monde remportées à vie (texte du 1er choix)
+    this.worldEndDone = false; // Fin du Monde gagnée CE CYCLE (remis à zéro au prestige) : ouvre les campagnes
     this.campaignsWon = {};    // campagnes terminées CE CYCLE de prestige (remis à zéro au prestige) : bloque à 1×/prestige
     // Nombre de fois que chaque monde a été « bouclé » (7 Vertus / Être divin /
     // Être démoniaque). PERSISTANT : renforce les PV des entités du monde à
@@ -100,6 +101,7 @@ class Game {
       seed: this.seed,
       world: this.world,
       worldEndWins: this.worldEndWins,
+      worldEndDone: this.worldEndDone,
       campaignsWon: this.campaignsWon,
       worldClears: this.worldClears,
       souls: this.souls,
@@ -171,6 +173,7 @@ class Game {
     this.seed = (typeof d.seed === 'number') ? d.seed : makeSeed();
     this.world = WORLDS[d.world] ? d.world : 'normal';
     this.worldEndWins = d.worldEndWins || 0;
+    this.worldEndDone = !!d.worldEndDone;
     this.campaignsWon = d.campaignsWon || {};
     this.worldClears = Object.assign({ normal: 0, cieux: 0, enfers: 0 }, d.worldClears || {});
     this.souls = d.souls || 0;
@@ -214,7 +217,7 @@ class Game {
     localStorage.removeItem(SAVE_KEY);
     this.seed = makeSeed();
     this.world = 'normal';
-    this.worldEndWins = 0; this.campaignsWon = {};
+    this.worldEndWins = 0; this.worldEndDone = false; this.campaignsWon = {};
     this.worldClears = { normal: 0, cieux: 0, enfers: 0 };
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
@@ -386,6 +389,9 @@ class Game {
     });
     this.cycleRavagesStart = this.totalDestroyed;
     // Remise à zéro de la progression (les mensonges en cours sont annulés).
+    // On refait TOUT le jeu à chaque prestige : la Fin du Monde et les campagnes
+    // doivent être re-débloquées (seul worldClears — la difficulté — persiste).
+    this.worldEndDone = false;
     this.campaignsWon = {};  // les campagnes redeviennent faisables (1×/prestige)
     this.world = 'normal';   // le prestige ramène toujours dans le monde normal
     this.souls = 0;
@@ -1347,6 +1353,7 @@ class Game {
     this.prestigePoints += WORLDEND_REWARD;
     this.worldEndCyclePoints += WORLDEND_REWARD; // comptabilisé dans le récap du cycle
     this.worldEndWins = (this.worldEndWins || 0) + 1;
+    this.worldEndDone = true;                    // ouvre les campagnes CE cycle
     const result = {
       cleared: true, worldEnd: 'won', prestigeBonus: WORLDEND_REWARD,
       destroyed: this.runDestroyed, total: this.runDestroyed,
@@ -1363,9 +1370,9 @@ class Game {
   }
 
   /* ---------------------- Campagnes d'endgame (Cieux / Enfers) ---------------------- */
-  /* Le choix Blasphème/Trahison est disponible dès qu'une Fin du Monde est
-   * remportée. */
-  canEndgame() { return (this.worldEndWins || 0) >= 1; }
+  /* Le choix Blasphème/Trahison est disponible une fois la Fin du Monde gagnée
+   * CE CYCLE de prestige (il faut la re-gagner après chaque prestige). */
+  canEndgame() { return !!this.worldEndDone; }
 
   /* Une campagne est-elle encore faisable ce cycle ? (1×/prestige) */
   campaignAvailable(world) {
