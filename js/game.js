@@ -733,6 +733,7 @@ class Game {
       src('Mensonge de Belial', '🎭', () => { s[this.lie.target] *= this.lie.factor; });
     if (this.lieMalus && typeof s[this.lieMalus.target] === 'number')
       src('Mensonge démasqué', '⛓️', () => { s[this.lieMalus.target] /= this.lieMalus.factor; });
+    this.applyServantBase(s);
     return { stats: s, contribs };
   }
 
@@ -767,6 +768,7 @@ class Game {
     if (this.lieMalus && typeof s[this.lieMalus.target] === 'number') {
       s[this.lieMalus.target] /= this.lieMalus.factor;
     }
+    this.applyServantBase(s);
     // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
     s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
@@ -779,21 +781,32 @@ class Game {
     return s;
   }
 
+  /* Base de dégâts sur laquelle scalent les SERVITEURS : les dégâts du démon
+   * PRIVÉS du bonus des Griffes Infernales (seule source additive de dégâts du
+   * démon). Les Griffes ne profitent donc qu'au démon lui-même et à ses sorts,
+   * plus à la horde. Comme tous les autres bonus de dégâts sont multiplicatifs,
+   * retirer la part des Griffes = mise à l'échelle par BASE_DAMAGE / (BASE+griffes). */
+  applyServantBase(s) {
+    const withGriffes = CONFIG.BASE_DAMAGE + 3 * this.upgradeLevel('griffes');
+    s.servantBase = withGriffes > 0 ? s.damage * (CONFIG.BASE_DAMAGE / withGriffes) : s.damage;
+  }
+
   /* Estimation du DPS à partir d'un objet de stats (pour le panneau 📊).
    * Valeurs approchées — l'objectif est de COMPARER ce qui est efficace, pas une
    * exactitude parfaite (peste et éclairs sont périodiques/continus). */
   dpsFromStats(s) {
     const ai = s.attackInterval > 0 ? s.attackInterval : CONFIG.BASE_ATTACK_INTERVAL;
     const demon = s.damage / ai;
-    const minionEach = (s.damage * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg);
+    const sb = s.servantBase != null ? s.servantBase : s.damage;   // dégâts hors Griffes
+    const minionEach = (sb * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg);
     const minions = s.minions * minionEach / ai;
     const colosse = s.demolisher > 0
-      ? ((s.damage * 2 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg)) / ai : 0;
+      ? ((sb * 2 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg)) / ai : 0;
     // Peste des vagabonds : dégâts continus (facteur d'occupation de zone ~0,4).
-    const vagabonds = s.vagabond * ((s.damage * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg)) * 0.4;
+    const vagabonds = s.vagabond * ((sb * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg)) * 0.4;
     // Éclairs des foudroyeurs : cadence approchée (base ~1,6 s, réduite par le pacte).
     const stormRate = 1 / Math.max(0.5, 1.6 * Math.pow(0.92, s.stormlingRate));
-    const foudroyeurs = s.stormling * ((s.damage * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg)) * stormRate;
+    const foudroyeurs = s.stormling * ((sb * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg)) * stormRate;
     const servants = minions + colosse + vagabonds + foudroyeurs;
     const spells = [];
     if (s.foudre > 0) spells.push({ name: 'Foudre (par frappe)',
@@ -1591,7 +1604,7 @@ class Game {
 
   /* Onde de choc du Colosse (premier coup sur un bâtiment). */
   demolisherShockwave(t, s) {
-    const dmg = (s.damage * 3 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg);
+    const dmg = (s.servantBase * 3 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg);
     this.impacts.push({ gx: t.gx, gy: t.gy, life: 0.4, max: 0.4, rad: 1 });
     for (const o of this.targets) {
       if (o.dead || o === t) continue;
@@ -1610,7 +1623,7 @@ class Game {
     if (storms.length < 2) return;
     const A = storms[0], B = storms[1];
     this.arc = { ax: A.gx, ay: A.gy, bx: B.gx, by: B.gy };
-    const dps = (s.damage * 2 + s.stormlingDmgFlat) * (1 + s.servantDmg);
+    const dps = (s.servantBase * 2 + s.stormlingDmgFlat) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (this.distToSegment(t.gx, t.gy, A.gx, A.gy, B.gx, B.gy) <= 0.6) {
@@ -1770,7 +1783,7 @@ class Game {
   }
 
   triumviratShock(a, s) {
-    const dmg = s.damage * 2.5 * (1 + s.servantDmg);
+    const dmg = s.servantBase * 2.5 * (1 + s.servantDmg);
     this.impacts.push({ gx: a.gx, gy: a.gy, life: 0.4, max: 0.4, rad: 1 });
     for (const o of this.targets) {
       if (o.dead) continue;
@@ -1785,7 +1798,7 @@ class Game {
     const storms = this.attackers.filter(x => x.isStormling);
     const vags = this.attackers.filter(x => x.isVagabond);
     const demo = this.attackers.find(x => x.isDemolisher);
-    const dps = s.damage * 1.8 * (1 + s.servantDmg);
+    const dps = s.servantBase * 1.8 * (1 + s.servantDmg);
     const segs = [];
     if (demo) for (const st of storms) segs.push([st, demo]);
     for (let i = 0; i + 1 < vags.length; i += 2) segs.push([vags[i], vags[i + 1]]);
@@ -1851,7 +1864,7 @@ class Game {
     }
     // Nuage de peste : dégâts continus autour du vagabond (plus large avec le trait).
     const radius = s.vagabondTrait ? 2.0 : 1.3;
-    const dps = (s.damage * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg);
+    const dps = (s.servantBase * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (Math.hypot(t.gx - a.gx, t.gy - a.gy) <= radius) {
@@ -1883,7 +1896,7 @@ class Game {
     const alive = this.targets.filter(t => !t.dead);
     if (!alive.length) return;
     a.lunge = 1;
-    const dmg = (s.damage * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg);
+    const dmg = (s.servantBase * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg);
     const bolts = 1 + s.foudroyeurTrait;
     for (let i = 0; i < bolts; i++) {
       const t = alive[Math.floor(Math.random() * alive.length)];
@@ -1927,11 +1940,11 @@ class Game {
       pack = 1 + s.packSynergy * nServ;
     }
     if (a.isDemolisher) {
-      let dmg = s.damage * 2 + s.minionDmgFlat + s.demoDmgFlat;  // base + bonus plats
+      let dmg = s.servantBase * 2 + s.minionDmgFlat + s.demoDmgFlat;  // base (hors Griffes) + bonus plats
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
       return dmg * (1 + s.servantDmg) * pack;
     }
-    return Math.max(1, (s.damage * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg) * pack); // serviteur
+    return Math.max(1, (s.servantBase * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg) * pack); // serviteur
   }
 
   hitTarget(t, dmg, source) {
