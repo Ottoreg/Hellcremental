@@ -809,6 +809,10 @@ html, body {
   box-shadow: 0 0 12px rgba(210,80,50,.3);
 }
 .vt-eg-btn.eg-enfers:hover { border-color: #ff8a63; color: #fff; }
+.vt-eg-btn:disabled, .ov-eg-btn:disabled {
+  opacity: .5; cursor: default; filter: grayscale(.5);
+}
+.vt-eg-btn:disabled:hover, .ov-eg-btn:disabled:hover { border-color: transparent; }
 
 /* Choix Blasphème / Trahison sur l'écran de fin (Fin du Monde gagnée). */
 .ov-endgame { margin-top: 14px; }

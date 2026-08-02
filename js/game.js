@@ -42,7 +42,11 @@ class Game {
     // La courbe de difficulté reste identique quel que soit le monde.
     this.world = 'normal';
     this.worldEndWins = 0;     // nombre de Fin du Monde remportées (déclenche le choix)
-    this.campaignsWon = {};    // campagnes d'endgame terminées : { cieux, enfers }
+    this.campaignsWon = {};    // campagnes terminées CE CYCLE de prestige (remis à zéro au prestige) : bloque à 1×/prestige
+    // Nombre de fois que chaque monde a été « bouclé » (7 Vertus / Être divin /
+    // Être démoniaque). PERSISTANT : renforce les PV des entités du monde à
+    // chaque complétion. { normal, cieux, enfers }
+    this.worldClears = { normal: 0, cieux: 0, enfers: 0 };
 
     // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
     // { stage, total } quand active, sinon null.
@@ -97,6 +101,7 @@ class Game {
       world: this.world,
       worldEndWins: this.worldEndWins,
       campaignsWon: this.campaignsWon,
+      worldClears: this.worldClears,
       souls: this.souls,
       level: this.level,
       upgrades: this.upgrades,
@@ -167,6 +172,7 @@ class Game {
     this.world = WORLDS[d.world] ? d.world : 'normal';
     this.worldEndWins = d.worldEndWins || 0;
     this.campaignsWon = d.campaignsWon || {};
+    this.worldClears = Object.assign({ normal: 0, cieux: 0, enfers: 0 }, d.worldClears || {});
     this.souls = d.souls || 0;
     this.level = d.level || 1;
     this.upgrades = d.upgrades || {};
@@ -209,6 +215,7 @@ class Game {
     this.seed = makeSeed();
     this.world = 'normal';
     this.worldEndWins = 0; this.campaignsWon = {};
+    this.worldClears = { normal: 0, cieux: 0, enfers: 0 };
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
@@ -379,6 +386,7 @@ class Game {
     });
     this.cycleRavagesStart = this.totalDestroyed;
     // Remise à zéro de la progression (les mensonges en cours sont annulés).
+    this.campaignsWon = {};  // les campagnes redeviennent faisables (1×/prestige)
     this.world = 'normal';   // le prestige ramène toujours dans le monde normal
     this.souls = 0;
     this.level = 1;
@@ -882,6 +890,9 @@ class Game {
     // une montée LINÉAIRE — l'ancrage au niveau 70 suffit à les durcir, et la
     // double exponentielle rendait toute campagne infaisable (facteur ×17).
     if (diffLevel > 70 && !isCampaign) hpMult *= 2 + (diffLevel - 71) * 0.1;
+    // Renforcement cumulatif : chaque fois que ce monde a été bouclé, ses entités
+    // gagnent en PV (New Game+ par monde).
+    hpMult *= 1 + (this.worldClears[this.world] || 0) * WORLD_CLEAR_HP;
     const valMult = 1 + (diffLevel - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
@@ -1356,9 +1367,15 @@ class Game {
    * remportée. */
   canEndgame() { return (this.worldEndWins || 0) >= 1; }
 
-  /* Lance une campagne d'endgame : 70 niveaux thématiques + boss ultime au 71. */
+  /* Une campagne est-elle encore faisable ce cycle ? (1×/prestige) */
+  campaignAvailable(world) {
+    return this.canEndgame() && world !== 'normal' && !!WORLDS[world] && !this.campaignsWon[world];
+  }
+
+  /* Lance une campagne d'endgame : 70 niveaux thématiques + boss ultime au 71.
+   * Bloquée si déjà remportée ce cycle de prestige. */
   startCampaign(world) {
-    if (!WORLDS[world] || world === 'normal' || !this.canEndgame()) return false;
+    if (!this.campaignAvailable(world)) return false;
     this.world = world;
     this.level = 1;
     this.worldEnd = null;
@@ -1374,7 +1391,8 @@ class Game {
   winCampaign() {
     const world = this.world;
     const def = this.worldDef();
-    this.campaignsWon[world] = true;
+    this.campaignsWon[world] = true;                       // bloque jusqu'au prochain prestige
+    this.worldClears[world] = (this.worldClears[world] || 0) + 1; // renforce les PV du monde
     this.prestigePoints += CAMPAIGN_REWARD;
     const result = {
       cleared: true, campaignWon: world,
@@ -1982,7 +2000,11 @@ class Game {
     if (t.def && t.def.virtue && !this.virtuesDefeated[t.def.virtue]) {
       this.virtuesDefeated[t.def.virtue] = true;
       this.justDefeatedVirtue = t.def.virtue; // pour l'écran de fin
-      if (this.allVirtuesDefeated()) this.justUnlockedPrestige = true;
+      if (this.allVirtuesDefeated()) {
+        this.justUnlockedPrestige = true;
+        // Monde normal bouclé (7 Vertus) → renforce ses entités pour la suite.
+        this.worldClears.normal = (this.worldClears.normal || 0) + 1;
+      }
       this.resolveLieOnVirtue(); // vérité/mensonge tranché à la prochaine Vertu
     }
     let gain = Math.max(1, Math.round(t.value * this.stats.soulMult));
