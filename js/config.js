@@ -1013,6 +1013,10 @@ const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
 // prestiges) : à 4.0, la campagne est quasi-infaisable à 0-1 prestige (on
 // atteint ~67-69/71) et se gagne à ~2 prestiges. Réglable via g.campaignDiffScale.
 const CAMPAIGN_DIFF_SCALE = 4.0;
+// Renforcement des PV par « bouclage » d'un monde : chaque fois qu'un monde est
+// terminé (7 Vertus / Être divin / Être démoniaque), les PV de ses entités
+// gagnent ce pourcentage (cumulatif, persistant). Ex. 0.5 = +50 % par complétion.
+const WORLD_CLEAR_HP = 0.5;
 
 /* -------- Biomes célestes -------- */
 const CIEUX_BIOMES = [

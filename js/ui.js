@@ -305,8 +305,8 @@ class UI {
       const c = g.campaignsWon || {};
       endgame =
         `<div class="vt-endgame">` +
-        `<button class="vt-eg-btn eg-cieux" data-world="cieux">☁️ Blasphème — Détruire les Cieux${c.cieux ? ' ✓' : ''}</button>` +
-        `<button class="vt-eg-btn eg-enfers" data-world="enfers">🔥 Trahison — Détruire les Enfers${c.enfers ? ' ✓' : ''}</button>` +
+        `<button class="vt-eg-btn eg-cieux" data-world="cieux"${c.cieux ? ' disabled' : ''}>☁️ Blasphème — Détruire les Cieux${c.cieux ? ' ✓' : ''}</button>` +
+        `<button class="vt-eg-btn eg-enfers" data-world="enfers"${c.enfers ? ' disabled' : ''}>🔥 Trahison — Détruire les Enfers${c.enfers ? ' ✓' : ''}</button>` +
         `</div>`;
     }
     el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
@@ -1571,8 +1571,8 @@ class UI {
       `<div class="ov-endgame-btns">` +
       `<button class="ov-eg-btn eg-worldend" data-act="worldend">🌍 Fin du Monde<small>Les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</small></button>`;
     if (g.canEndgame()) {
-      html += `<button class="ov-eg-btn eg-cieux" data-act="cieux">☁️ Blasphème<small>Détruis les Cieux${c.cieux ? ' ✓' : ''}</small></button>` +
-        `<button class="ov-eg-btn eg-enfers" data-act="enfers">🔥 Trahison<small>Détruis les Enfers${c.enfers ? ' ✓' : ''}</small></button>`;
+      html += `<button class="ov-eg-btn eg-cieux" data-act="cieux"${c.cieux ? ' disabled' : ''}>☁️ Blasphème<small>${c.cieux ? 'Accompli ✓' : 'Détruis les Cieux'}</small></button>` +
+        `<button class="ov-eg-btn eg-enfers" data-act="enfers"${c.enfers ? ' disabled' : ''}>🔥 Trahison<small>${c.enfers ? 'Accompli ✓' : 'Détruis les Enfers'}</small></button>`;
     }
     html += `</div>`;
     wrap.innerHTML = html;
