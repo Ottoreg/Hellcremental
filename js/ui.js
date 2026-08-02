@@ -39,6 +39,33 @@ class UI {
     b.title = on ? 'Couper la musique' : 'Musique métal';
   }
 
+  /* Met à jour le bouton d'enchaînement automatique. */
+  updateAutoBtn() {
+    const b = this.$('auto-btn');
+    if (!b) return;
+    b.classList.toggle('on', !!this.autoPlay);
+    b.title = this.autoPlay ? 'Auto ON — enchaînement des niveaux' : 'Auto OFF — niveaux manuels';
+  }
+
+  /* Enchaînement automatique : si actif et qu'un écran de fin de niveau NORMAL
+   * est affiché, passe au niveau suivant (ou relance) après une brève pause.
+   * Ne touche jamais aux écrans Fin du Monde / campagne (choix explicite). */
+  scheduleAuto() {
+    clearTimeout(this._autoTimer);
+    if (!this.autoPlay) return;
+    if (this._resultWasWorldEnd || this._resultWasCampaign) return;
+    const ov = this.$('overlay');
+    if (ov.classList.contains('hidden')) return; // aucun écran de fin en cours
+    this._autoTimer = setTimeout(() => {
+      if (!this.autoPlay) return;
+      if (this._resultWasWorldEnd || this._resultWasCampaign) return;
+      if (ov.classList.contains('hidden')) return;  // déjà enchaîné manuellement
+      if (this.game.paused) { this.scheduleAuto(); return; } // sur boutique/autel : on réessaie
+      ov.classList.add('hidden');
+      this.startRun();
+    }, 1100);
+  }
+
   bind() {
     this.$('start-btn').addEventListener('click', () => this.startRun());
     this.$('resume-btn').addEventListener('click', () => this.resumeRun());
@@ -61,6 +88,16 @@ class UI {
     // Si activée dans une session précédente, redémarre au premier geste
     // (les navigateurs exigent une interaction pour lancer l'audio).
     window.addEventListener('pointerdown', () => HellMusic.kick(), { once: true });
+
+    // Enchaînement automatique des niveaux (mode idle).
+    try { this.autoPlay = localStorage.getItem('hellcremental_auto') === '1'; } catch (e) { this.autoPlay = false; }
+    this.updateAutoBtn();
+    this.$('auto-btn').addEventListener('click', () => {
+      this.autoPlay = !this.autoPlay;
+      try { localStorage.setItem('hellcremental_auto', this.autoPlay ? '1' : '0'); } catch (e) {}
+      this.updateAutoBtn();
+      this.scheduleAuto(); // enchaîne aussitôt si un écran de fin est déjà affiché
+    });
 
     // Vue de fin (côté Chaos) : relancer / niveau suivant.
     this.$('overlay-btn').addEventListener('click', () => {
@@ -1520,6 +1557,7 @@ class UI {
     this.$('overlay-improve').classList.toggle('hidden', !mobile);
     ov.classList.remove('hidden');
     this.refresh();
+    this.scheduleAuto();   // enchaînement automatique si activé
   }
 
   /* Ajoute à un écran de fin les accès endgame : Fin du Monde + campagnes
