@@ -1015,8 +1015,8 @@ const ULTIMATE_HP_FACTOR = 2.5;   // multiplicateur de PV du boss ultime
 const CAMPAIGN_DIFF_SCALE = 4.0;
 // Renforcement des PV par « bouclage » d'un monde : chaque fois qu'un monde est
 // terminé (7 Vertus / Être divin / Être démoniaque), les PV de ses entités
-// gagnent ce pourcentage (cumulatif, persistant). Ex. 0.5 = +50 % par complétion.
-const WORLD_CLEAR_HP = 0.5;
+// gagnent ce pourcentage (cumulatif, persistant). 0.15 = +15 % par complétion.
+const WORLD_CLEAR_HP = 0.15;
 
 /* -------- Biomes célestes -------- */
 const CIEUX_BIOMES = [
