@@ -199,12 +199,31 @@ const HellMusic = (function () {
     comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10; comp.ratio.value = 8; comp.attack.value = 0.003; comp.release.value = 0.2;
     master.connect(comp); comp.connect(ctx.destination);
+    // Mobile : le contexte est suspendu en arrière-plan → on le réveille au retour.
+    document.addEventListener('visibilitychange', () => {
+      if (running && ctx && !document.hidden && ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    });
+  }
+
+  // Déverrouillage audio mobile : sur iOS/Android le contexte démarre
+  // « suspendu » et doit être réveillé DANS un geste utilisateur ; jouer un
+  // tampon silencieux force le déblocage sur les WebKit récalcitrants.
+  function unlock() {
+    if (!ctx) return;
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    try {
+      const b = ctx.createBufferSource();
+      b.buffer = ctx.createBuffer(1, 1, 22050);
+      b.connect(ctx.destination);
+      b.start(0);
+    } catch (e) { /* ignore */ }
   }
 
   function start() {
     ensureCtx();
     if (!ctx) return;
-    if (ctx.state === 'suspended') ctx.resume();
+    unlock();
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
     // Fondu d'entrée doux.
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setValueAtTime(master.gain.value, ctx.currentTime);

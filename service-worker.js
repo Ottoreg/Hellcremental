@@ -4,12 +4,15 @@
  * et une installation sur l'écran d'accueil (mobile & bureau).
  * ========================================================================= */
 
-const CACHE = 'hellcremental-v2';
+// Version du cache : à INCRÉMENTER à chaque déploiement pour forcer la mise à
+// jour des applications déjà installées (l'ancien cache est purgé à l'activation).
+const CACHE = 'hellcremental-v3';
 
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './js/music.js',
   './js/config.js',
   './js/rng.js',
   './js/iso.js',
@@ -39,21 +42,22 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Requêtes : cache d'abord, réseau en repli (avec mise en cache à la volée).
+// Requêtes : « stale-while-revalidate » — on sert le cache immédiatement (rapide,
+// hors-ligne) MAIS on rafraîchit toujours depuis le réseau en arrière-plan, de
+// sorte que les mises à jour du jeu se propagent d'un lancement à l'autre (fini
+// la version figée des applications installées).
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request)
+    caches.open(CACHE).then(async (cache) => {
+      const cached = await cache.match(e.request);
+      const network = fetch(e.request)
         .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
+          if (res && res.status === 200 && res.type === 'basic') cache.put(e.request, res.clone());
           return res;
         })
         .catch(() => cached);
+      return cached || network;
     })
   );
 });
