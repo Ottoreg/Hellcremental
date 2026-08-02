@@ -316,10 +316,10 @@ const UPGRADES = [
   },
   {
     id: 'legion_force', name: 'Serviteurs Aguerris', emoji: '💪',
-    desc: 'Chaque serviteur — et le Démolisseur — frappe bien plus fort.',
+    desc: 'Chaque serviteur — et le Démolisseur — frappe plus fort (dégâts fixes).',
     baseCost: 350, mult: 1.45, max: 25,
-    effect: (n) => `+${Math.round(n * 25)}% de dégâts des serviteurs`,
-    apply: (s, n) => { s.minionDmgBonus += 0.25 * n; },
+    effect: (n) => `+${3 * n} dégâts des serviteurs`,
+    apply: (s, n) => { s.minionDmgFlat += 3 * n; },
   },
   {
     id: 'chasse_pretres', name: 'Traque Sacrilège', emoji: '🎯',
@@ -333,10 +333,10 @@ const UPGRADES = [
   // --- Améliorations des serviteurs de base ---
   {
     id: 'minion_dmg', name: 'Serviteurs Brutaux', emoji: '⚔️',
-    desc: 'Tes esprits serviteurs frappent plus fort.',
+    desc: 'Tes esprits serviteurs frappent plus fort (dégâts fixes).',
     baseCost: 500, mult: 1.45, max: 20,
-    effect: (n) => `+${Math.round(n * 20)}% de dégâts des serviteurs`,
-    apply: (s, n) => { s.minionDmgBonus += 0.2 * n; },
+    effect: (n) => `+${3 * n} dégâts des serviteurs`,
+    apply: (s, n) => { s.minionDmgFlat += 3 * n; },
   },
   {
     id: 'minion_speed', name: 'Serviteurs Agiles', emoji: '💨',
@@ -349,10 +349,10 @@ const UPGRADES = [
   // --- Améliorations du Colosse (Démolisseur) ---
   {
     id: 'demo_dmg', name: 'Colosse Enragé', emoji: '🔨',
-    desc: 'Le Démolisseur cogne encore plus fort.',
+    desc: 'Le Démolisseur cogne encore plus fort (dégâts fixes).',
     baseCost: 1500, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 30)}% de dégâts du Colosse`,
-    apply: (s, n) => { s.demoDmgBonus += 0.3 * n; },
+    effect: (n) => `+${8 * n} dégâts du Colosse`,
+    apply: (s, n) => { s.demoDmgFlat += 8 * n; },
   },
   {
     id: 'demo_speed', name: 'Colosse Furieux', emoji: '🏃',
@@ -373,10 +373,10 @@ const UPGRADES = [
   },
   {
     id: 'vagabond_dmg', name: 'Peste Virulente', emoji: '🦠',
-    desc: 'Le nuage de peste des vagabonds ronge bien plus vite.',
+    desc: 'Le nuage de peste des vagabonds ronge plus fort (dégâts fixes).',
     baseCost: 3000, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 25)}% de dégâts de peste`,
-    apply: (s, n) => { s.vagabondDmg += 0.25 * n; },
+    effect: (n) => `+${4 * n} dégâts de peste`,
+    apply: (s, n) => { s.vagabondDmgFlat += 4 * n; },
   },
   {
     id: 'vagabond_speed', name: 'Errance Fébrile', emoji: '👣',
@@ -397,10 +397,10 @@ const UPGRADES = [
   },
   {
     id: 'foudroyeur_dmg', name: 'Décharge Amplifiée', emoji: '⚡',
-    desc: 'Les éclairs des foudroyeurs frappent plus fort.',
+    desc: 'Les éclairs des foudroyeurs frappent plus fort (dégâts fixes).',
     baseCost: 6000, mult: 1.5, max: 20,
-    effect: (n) => `+${Math.round(n * 30)}% de dégâts des éclairs`,
-    apply: (s, n) => { s.stormlingDmg += 0.3 * n; },
+    effect: (n) => `+${6 * n} dégâts des éclairs`,
+    apply: (s, n) => { s.stormlingDmgFlat += 6 * n; },
   },
   {
     id: 'foudroyeur_rate', name: 'Cadence Foudroyante', emoji: '⏱️',
@@ -870,14 +870,14 @@ const STAT_ROWS = [
   { group: 'Démon', key: 'soulMult',       label: "Récolte d'âmes",      type: 'mult' },
 
   { group: 'Serviteurs & Pouvoirs', key: 'minions',       label: 'Esprits serviteurs',  type: 'int', hideIfZero: true },
-  { group: 'Serviteurs & Pouvoirs', key: 'minionDmgBonus',label: 'Dégâts serviteurs',   type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'minionDmgFlat',  label: 'Dégâts serviteurs',   type: 'int', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'minionSpeed',   label: 'Vitesse serviteurs',  type: 'pct', hideIfZero: true },
-  { group: 'Serviteurs & Pouvoirs', key: 'demoDmgBonus',  label: 'Dégâts du Colosse',   type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'demoDmgFlat',   label: 'Dégâts du Colosse',   type: 'int', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'demoSpeed',     label: 'Vitesse du Colosse',  type: 'pct', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'vagabond',      label: 'Vagabonds',           type: 'int', hideIfZero: true },
-  { group: 'Serviteurs & Pouvoirs', key: 'vagabondDmg',   label: 'Dégâts de peste',     type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'vagabondDmgFlat',label: 'Dégâts de peste',    type: 'int', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'stormling',     label: 'Foudroyeurs',         type: 'int', hideIfZero: true },
-  { group: 'Serviteurs & Pouvoirs', key: 'stormlingDmg',  label: 'Dégâts des éclairs',  type: 'pct', hideIfZero: true },
+  { group: 'Serviteurs & Pouvoirs', key: 'stormlingDmgFlat',label: 'Dégâts des éclairs', type: 'int', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'servantDmg',    label: 'Dégâts serviteurs (global)', type: 'pct', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'powerDmg',      label: 'Dégâts des pouvoirs', type: 'pct', hideIfZero: true },
   { group: 'Serviteurs & Pouvoirs', key: 'foudreDmg',     label: 'Dégâts de la Foudre', type: 'pct', hideIfZero: true },

@@ -616,6 +616,8 @@ class Game {
   isUnlocked(id) {
     const node = SKILL_TREE.find(n => n.id === id);
     if (!node) return true;
+    // Astaroth bannit le Serment du Chaos Absolu : le pacte est verrouillé.
+    if (id === 'pacte_libre' && this.incarnation === 'astaroth') return false;
     // Pacte hyper-spécialisé (Astaroth) : accessible seulement en incarnant Astaroth.
     if (node.reqHyper && this.incarnation !== 'astaroth') return false;
     // Voies exclusives : choisir l'une verrouille les autres du même groupe.
@@ -665,12 +667,14 @@ class Game {
       lifespan: CONFIG.BASE_LIFESPAN,
       clickDamage: CONFIG.BASE_CLICK_DAMAGE,
       splash: 0, soulMult: 1, minions: 0, demolisher: 0,
-      minionDmgBonus: 0, voieMagie: 0, voieLegion: 0, foudre: 0,
+      // Bonus de dégâts des serviteurs : désormais PLATS (ajoutés aux dégâts du
+      // serviteur), plus des pourcentages — ce qui casse le snowball tardif.
+      minionDmgFlat: 0, voieMagie: 0, voieLegion: 0, foudre: 0,
       voieClic: 0, fireWave: 0,
-      minionSpeed: 0, demoDmgBonus: 0, demoSpeed: 0,
-      vagabond: 0, vagabondDmg: 0, vagabondSpeed: 0, stormling: 0,
+      minionSpeed: 0, demoDmgFlat: 0, demoSpeed: 0,
+      vagabond: 0, vagabondDmgFlat: 0, vagabondSpeed: 0, stormling: 0,
       meteore: 0, huntPriests: 0,
-      stormlingDmg: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
+      stormlingDmgFlat: 0, stormlingRate: 0, demoTrait: 0, vagabondTrait: 0,
       foudroyeurTrait: 0, meteoreZone: 0, blackfire: 0, voiesLibres: 0,
       foudreDmg: 0, finisher: 0, priestSteal: 0, holyDmg: 0, slothSlow: 0,
       powerDmg: 0, servantDmg: 0, lieBonus: 0,
@@ -759,15 +763,15 @@ class Game {
   dpsFromStats(s) {
     const ai = s.attackInterval > 0 ? s.attackInterval : CONFIG.BASE_ATTACK_INTERVAL;
     const demon = s.damage / ai;
-    const minionEach = s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg);
+    const minionEach = (s.damage * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg);
     const minions = s.minions * minionEach / ai;
     const colosse = s.demolisher > 0
-      ? (s.damage * 2 * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg)) / ai : 0;
+      ? ((s.damage * 2 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg)) / ai : 0;
     // Peste des vagabonds : dégâts continus (facteur d'occupation de zone ~0,4).
-    const vagabonds = s.vagabond * (s.damage * 2.0 * (1 + s.vagabondDmg) * (1 + s.servantDmg)) * 0.4;
+    const vagabonds = s.vagabond * ((s.damage * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg)) * 0.4;
     // Éclairs des foudroyeurs : cadence approchée (base ~1,6 s, réduite par le pacte).
     const stormRate = 1 / Math.max(0.5, 1.6 * Math.pow(0.92, s.stormlingRate));
-    const foudroyeurs = s.stormling * (s.damage * 7.5 * (1 + s.stormlingDmg) * (1 + s.servantDmg)) * stormRate;
+    const foudroyeurs = s.stormling * ((s.damage * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg)) * stormRate;
     const servants = minions + colosse + vagabonds + foudroyeurs;
     const spells = [];
     if (s.foudre > 0) spells.push({ name: 'Foudre (par frappe)',
@@ -1565,7 +1569,7 @@ class Game {
 
   /* Onde de choc du Colosse (premier coup sur un bâtiment). */
   demolisherShockwave(t, s) {
-    const dmg = s.damage * 3 * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg);
+    const dmg = (s.damage * 3 + s.minionDmgFlat + s.demoDmgFlat) * (1 + s.servantDmg);
     this.impacts.push({ gx: t.gx, gy: t.gy, life: 0.4, max: 0.4, rad: 1 });
     for (const o of this.targets) {
       if (o.dead || o === t) continue;
@@ -1584,7 +1588,7 @@ class Game {
     if (storms.length < 2) return;
     const A = storms[0], B = storms[1];
     this.arc = { ax: A.gx, ay: A.gy, bx: B.gx, by: B.gy };
-    const dps = s.damage * 2 * (1 + s.stormlingDmg) * (1 + s.servantDmg);
+    const dps = (s.damage * 2 + s.stormlingDmgFlat) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (this.distToSegment(t.gx, t.gy, A.gx, A.gy, B.gx, B.gy) <= 0.6) {
@@ -1825,7 +1829,7 @@ class Game {
     }
     // Nuage de peste : dégâts continus autour du vagabond (plus large avec le trait).
     const radius = s.vagabondTrait ? 2.0 : 1.3;
-    const dps = s.damage * 2.0 * (1 + s.vagabondDmg) * (1 + s.servantDmg);
+    const dps = (s.damage * 2.0 + s.vagabondDmgFlat) * (1 + s.servantDmg);
     for (const t of this.targets) {
       if (t.dead) continue;
       if (Math.hypot(t.gx - a.gx, t.gy - a.gy) <= radius) {
@@ -1857,7 +1861,7 @@ class Game {
     const alive = this.targets.filter(t => !t.dead);
     if (!alive.length) return;
     a.lunge = 1;
-    const dmg = s.damage * 7.5 * (1 + s.stormlingDmg) * (1 + s.servantDmg);
+    const dmg = (s.damage * 7.5 + s.stormlingDmgFlat) * (1 + s.servantDmg);
     const bolts = 1 + s.foudroyeurTrait;
     for (let i = 0; i < bolts; i++) {
       const t = alive[Math.floor(Math.random() * alive.length)];
@@ -1901,11 +1905,11 @@ class Game {
       pack = 1 + s.packSynergy * nServ;
     }
     if (a.isDemolisher) {
-      let dmg = s.damage * 2;                 // colosse : frappe lourde
+      let dmg = s.damage * 2 + s.minionDmgFlat + s.demoDmgFlat;  // base + bonus plats
       if (!t.def.living) dmg *= 2.5;          // dégâts renforcés contre le non-vivant
-      return dmg * (1 + s.minionDmgBonus + s.demoDmgBonus) * (1 + s.servantDmg) * pack;
+      return dmg * (1 + s.servantDmg) * pack;
     }
-    return Math.max(1, s.damage * 0.5 * (1 + s.minionDmgBonus) * (1 + s.servantDmg) * pack); // serviteur
+    return Math.max(1, (s.damage * 0.5 + s.minionDmgFlat) * (1 + s.servantDmg) * pack); // serviteur
   }
 
   hitTarget(t, dmg, source) {
