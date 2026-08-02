@@ -814,7 +814,12 @@ html, body {
   font-size: 13px; font-weight: bold; color: #ffe08a; text-align: center;
   margin: 0 0 8px; letter-spacing: .3px;
 }
-.ov-endgame-btns { display: flex; gap: 10px; }
+.ov-endgame-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.ov-eg-btn.eg-worldend {
+  border-color: #7a4bd0;
+  background: linear-gradient(180deg, rgba(90,45,150,.55), rgba(45,20,80,.75));
+}
+.ov-eg-btn.eg-worldend:hover { border-color: #a071ff; }
 .ov-eg-btn {
   flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center;
   padding: 12px 10px; border-radius: 12px; cursor: pointer; border: 1px solid transparent;

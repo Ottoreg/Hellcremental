@@ -1069,7 +1069,31 @@ class UI {
     const eff = this.$('node-effect');
     const buy = this.$('node-buy');
     if (!unlocked) {
-      // Noms des pactes prérequis (encore non achetés) à invoquer d'abord.
+      const node = SKILL_TREE.find((nd) => nd.id === def.id);
+      // Motif RÉEL du verrouillage (pas forcément « prérequis manquant »).
+      // 1) Astaroth bannit le Serment du Chaos.
+      if (def.id === 'pacte_libre' && g.incarnation === 'astaroth') {
+        eff.innerHTML = `<span class="nxt">🔒 Astaroth interdit le Serment du Chaos : ` +
+          `ton hyper-spécialisation impose une <b>seule voie</b>.</span>`;
+        buy.disabled = true; buy.textContent = '🔒 Banni par Astaroth';
+        return;
+      }
+      // 2) Voie exclusive : une voie rivale a déjà été choisie.
+      if (node && node.group && !g.voiesFree()) {
+        const rival = SKILL_TREE.find((o) => o.group === node.group && o.id !== def.id
+          && g.upgradeLevel(o.id) >= 1);
+        if (rival) {
+          const rn = (UPGRADES.find((u) => u.id === rival.id) || {}).name;
+          eff.innerHTML = g.incarnation === 'astaroth'
+            ? `<span class="nxt">🔒 Hyper-spécialisation d'Astaroth : ta voie unique est ` +
+              `<b>« ${rn} »</b>. Les autres voies sont verrouillées à jamais.</span>`
+            : `<span class="nxt">🔒 Voie exclusive : tu as déjà choisi <b>« ${rn} »</b>. ` +
+              `(Le Serment du Chaos lèverait cette exclusivité.)</span>`;
+          buy.disabled = true; buy.textContent = '🔒 Voie déjà choisie';
+          return;
+        }
+      }
+      // 3) Sinon : prérequis (pacte parent) réellement manquant.
       const missing = g.prereqIds(def.id)
         .filter((pid) => g.upgradeLevel(pid) < 1)
         .map((pid) => (UPGRADES.find((u) => u.id === pid) || {}).name)
@@ -1486,9 +1510,38 @@ class UI {
         body.appendChild(pr);
       }
     }
+    // Accès endgame : dès que les 7 Vertus sont tombées (monde normal), on
+    // propose directement la Fin du Monde et les campagnes — plus besoin de
+    // repasser par l'écran d'accueil (chaque cycle après prestige).
+    if (g.world === 'normal' && g.allVirtuesDefeated() && !g.worldEnd) {
+      this.appendEndgameAccess(body);
+    }
     // Bouton secondaire « Améliorer » : utile sur mobile (l'arbre est un autre onglet).
     this.$('overlay-improve').classList.toggle('hidden', !mobile);
     ov.classList.remove('hidden');
     this.refresh();
+  }
+
+  /* Ajoute à un écran de fin les accès endgame : Fin du Monde + campagnes
+   * (Blasphème/Trahison si débloquées). */
+  appendEndgameAccess(body) {
+    const g = this.game;
+    const c = g.campaignsWon || {};
+    const wrap = document.createElement('div');
+    wrap.className = 'ov-endgame';
+    let html = `<p class="ov-endgame-lead">✦ Les 7 Vertus sont tombées — l'apocalypse t'attend ✦</p>` +
+      `<div class="ov-endgame-btns">` +
+      `<button class="ov-eg-btn eg-worldend" data-act="worldend">🌍 Fin du Monde<small>Les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</small></button>`;
+    if (g.canEndgame()) {
+      html += `<button class="ov-eg-btn eg-cieux" data-act="cieux">☁️ Blasphème<small>Détruis les Cieux${c.cieux ? ' ✓' : ''}</small></button>` +
+        `<button class="ov-eg-btn eg-enfers" data-act="enfers">🔥 Trahison<small>Détruis les Enfers${c.enfers ? ' ✓' : ''}</small></button>`;
+    }
+    html += `</div>`;
+    wrap.innerHTML = html;
+    body.appendChild(wrap);
+    wrap.querySelectorAll('.ov-eg-btn').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'worldend') this.startWorldEnd();
+      else this.startCampaign(b.dataset.act);
+    }));
   }
 }
