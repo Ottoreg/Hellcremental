@@ -823,6 +823,14 @@ class UI {
           .forEach((line) => { line.style.display = show ? '' : 'none'; });
         if (!show) continue;
       }
+      // Astaroth bannit le Serment du Chaos Absolu : node masqué en l'incarnant.
+      if (def.id === 'pacte_libre') {
+        const hide = g.incarnation === 'astaroth';
+        el.style.display = hide ? 'none' : '';
+        this.$('tree-links').querySelectorAll(`line[data-id="pacte_libre"]`)
+          .forEach((line) => { line.style.display = hide ? 'none' : ''; });
+        if (hide) continue;
+      }
       const n = g.upgradeLevel(def.id);
       const maxed = n >= def.max;
       const cost = g.upgradeCost(def);
