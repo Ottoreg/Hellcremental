@@ -130,6 +130,12 @@ html, body {
   transition: transform .1s, box-shadow .2s, border-color .2s;
 }
 .ability-btn .ab-emoji { font-size: 28px; line-height: 1; }
+/* Badge du raccourci clavier (rangée du haut) en coin du bouton. */
+.ability-btn .ab-key {
+  position: absolute; top: 2px; left: 4px; z-index: 3;
+  font-size: 11px; font-weight: bold; line-height: 1; color: #cfe8ff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.9); pointer-events: none;
+}
 .ability-btn.ready {
   border-color: #7fd0ff;
   box-shadow: 0 0 16px rgba(120,200,255,.55), 0 0 0 1px rgba(120,200,255,.4) inset;
@@ -919,10 +925,64 @@ html, body {
 }
 
 /* ---------------- Panneau des statistiques cumulées (📊) ---------------- */
-#stats-modal {
+#stats-modal, #bestiary-modal {
   position: fixed; inset: 0; z-index: 22;
   display: flex; align-items: center; justify-content: center;
   background: rgba(10,4,16,.82); backdrop-filter: blur(4px); padding: 16px;
+}
+/* Bestiaire : grille compacte emoji / nom / compteur. */
+.bestiary-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px;
+}
+.bestiary-item {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px;
+  background: rgba(24,20,32,.5);
+}
+.bestiary-item .be-emoji { font-size: 20px; line-height: 1; flex: 0 0 auto; }
+.bestiary-item .be-name { font-size: 13px; color: #e0e0ec; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bestiary-item .be-count { font-size: 14px; font-weight: bold; color: #ffcc4d; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.bestiary-empty { color: var(--muted); font-size: 13.5px; text-align: center; padding: 20px 0; }
+
+/* ---------------- Pacte faustien (Méphisto) ---------------- */
+#faust-modal {
+  position: fixed; inset: 0; z-index: 24;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8,2,4,.88); backdrop-filter: blur(5px); padding: 16px;
+}
+.faust-card-wrap {
+  width: 100%; max-width: 720px; animation: pop .25s ease;
+}
+.faust-head { text-align: center; margin-bottom: 16px; }
+.faust-head .faust-emoji { font-size: 40px; line-height: 1; display: block; margin-bottom: 4px; }
+.faust-head h2 { font-family: Georgia, serif; color: #f0d9a0; font-size: 24px; letter-spacing: .5px; }
+.faust-sub { font-size: 13px; color: #d0b48c; margin-top: 4px; }
+.faust-sub span { color: #fff; font-weight: bold; }
+.faust-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.faust-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 7px;
+  padding: 18px 12px; cursor: pointer; color: #fff;
+  border: 2px solid #7a3b2e; border-radius: 16px;
+  background: linear-gradient(180deg, #2a1512, #160a0c);
+  transition: transform .12s, box-shadow .2s, border-color .2s;
+}
+.faust-card:hover, .faust-card:focus {
+  transform: translateY(-3px); border-color: #e0a94d;
+  box-shadow: 0 0 22px -4px rgba(224,169,77,.6);
+}
+.faust-card:active { transform: scale(.97); }
+.faust-card .fc-emoji { font-size: 34px; line-height: 1; }
+.faust-card .fc-name { font-family: Georgia, serif; font-size: 16px; color: #f0d9a0; }
+.faust-card .fc-boon { font-size: 13px; color: #8fe0a0; line-height: 1.35; }
+.faust-card .fc-bane { font-size: 12.5px; color: #e8837a; line-height: 1.35; }
+@media (max-width: 560px) {
+  .faust-grid { grid-template-columns: 1fr; gap: 8px; }
+  .faust-card { flex-direction: row; flex-wrap: wrap; text-align: left; justify-content: flex-start; padding: 12px; gap: 4px 10px; }
+  .faust-card .fc-emoji { font-size: 26px; }
+  .faust-card .fc-name { flex: 1 1 auto; font-size: 15px; }
+  .faust-card .fc-boon, .faust-card .fc-bane { flex-basis: 100%; }
 }
 .stats-card {
   position: relative;

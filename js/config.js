@@ -835,8 +835,81 @@ const INCARNATIONS = [
           'rembourse la moitié). En échange, ta voie révèle de nouveaux pactes ' +
           'ultimes qui parachèvent ta spécialisation.',
   },
-  { id: 'soon3', name: '???', title: 'À venir', emoji: '🔒', color: '#555', available: false,
-    desc: 'Un autre démon primordial sommeille encore...' },
+  {
+    id: 'mephisto', name: 'Méphisto', title: 'Marchand d\'Âmes',
+    emoji: '📜', color: '#c0392b', available: true,
+    desc: 'PACTE FAUSTIEN : au début de CHAQUE niveau, Méphisto te propose 3 ' +
+          'pactes tirés du destin (liés à la graine : un niveau donné offre ' +
+          'toujours les mêmes 3). Chacun t\'accorde un pouvoir puissant assorti ' +
+          'd\'une contrepartie, valable pour ce seul niveau. À toi de choisir ' +
+          'ton marché.',
+  },
+];
+
+/* -------------------------------------------------------------------------
+ * Pactes faustiens de Méphisto.
+ * Chaque niveau, 3 de ces pactes sont proposés (tirage DÉTERMINISTE dérivé de
+ * la graine + du numéro de niveau : un niveau donné montre toujours les mêmes
+ * 3 options). Le pacte choisi ne vaut que pour le niveau en cours.
+ *   apply(s) : effets sur les stats (bienfait ET contrepartie).
+ *   hpMult   : (optionnel) multiplie les PV des entités du niveau.
+ *   forceClic / noClic : (optionnel) force / interdit le clic infernal ce niveau.
+ * ------------------------------------------------------------------------- */
+const FAUST_SALT = 90210; // sel de graine dédié au tirage des pactes faustiens
+const FAUST_PACTS = [
+  {
+    id: 'sang', name: 'Pacte de Sang', emoji: '🩸',
+    boon: '+150 % de dégâts', bane: '−35 % de temps de survie',
+    apply: (s) => { s.damage *= 2.5; s.lifespan *= 0.65; },
+  },
+  {
+    id: 'or', name: 'Pacte de l\'Or', emoji: '🪙',
+    boon: 'Âmes récoltées ×2,5', bane: '−40 % de dégâts',
+    apply: (s) => { s.soulMult *= 2.5; s.damage *= 0.6; },
+  },
+  {
+    id: 'fureur', name: 'Pacte de Fureur', emoji: '⚡',
+    boon: 'Cadence d\'attaque +100 %, vitesse +50 %', bane: 'Ennemis +40 % de PV',
+    apply: (s) => { s.attackInterval *= 0.5; s.moveSpeed *= 1.5; },
+    hpMult: 1.4,
+  },
+  {
+    id: 'colosse', name: 'Pacte du Colosse', emoji: '🗿',
+    boon: 'Dégâts de zone +200 %, dégâts +30 %', bane: '−45 % de vitesse de déplacement',
+    apply: (s) => { s.splash += 2; s.damage *= 1.3; s.moveSpeed *= 0.55; },
+  },
+  {
+    id: 'horde', name: 'Pacte de la Horde', emoji: '🧟',
+    boon: 'Dégâts des serviteurs +120 %', bane: '−50 % de dégâts du démon',
+    apply: (s) => { s.servantDmg += 1.2; s.damage *= 0.5; },
+  },
+  {
+    id: 'avarice', name: 'Pacte de l\'Avare', emoji: '⏳',
+    boon: '+60 % de temps de survie', bane: '−50 % d\'âmes récoltées',
+    apply: (s) => { s.lifespan *= 1.6; s.soulMult *= 0.5; },
+  },
+  {
+    id: 'damne', name: 'Pacte du Damné', emoji: '💀',
+    boon: '+80 % de dégâts et +80 % d\'âmes', bane: 'Ennemis +60 % de PV, −20 % de temps',
+    apply: (s) => { s.damage *= 1.8; s.soulMult *= 1.8; s.lifespan *= 0.8; },
+    hpMult: 1.6,
+  },
+  {
+    id: 'frenesie', name: 'Pacte de Frénésie', emoji: '🔥',
+    boon: 'Dégâts, cadence, vitesse et zone +40 %', bane: '−40 % de temps de survie',
+    apply: (s) => { s.damage *= 1.4; s.attackInterval *= 0.6; s.moveSpeed *= 1.4; s.splash += 0.6; s.lifespan *= 0.6; },
+  },
+  {
+    id: 'griffe', name: 'Pacte de la Griffe', emoji: '👊',
+    boon: 'Clic infernal débloqué et ×3 ce niveau', bane: '−45 % de dégâts d\'attaque',
+    apply: (s) => { s.clickDamage *= 3; s.damage *= 0.55; },
+    forceClic: true,
+  },
+  {
+    id: 'tempete', name: 'Pacte de la Tempête', emoji: '🌩️',
+    boon: 'Dégâts des pouvoirs +150 %', bane: '−30 % de dégâts de base',
+    apply: (s) => { s.powerDmg += 1.5; s.damage *= 0.7; },
+  },
 ];
 
 /* Cibles possibles d'un mensonge (statistiques « plus = mieux » + âmes). */

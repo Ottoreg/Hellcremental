@@ -27,6 +27,7 @@ class Game {
     this.cycleRavagesStart = 0;// ravages au début du cycle de prestige courant
     // Incarnation d'un démon primordial (débloqué après ≥1 prestige).
     this.incarnation = null;   // ex. 'belial'
+    this.faustId = null;       // pacte faustien de Méphisto choisi pour le niveau EN COURS (transitoire)
     this.lie = null;           // mensonge de Belial actif { target, factor, claimed, base, soulsEarned }
     this.lieMalus = null;      // pénalité d'un mensonge non tenu { target, factor }
     this.soulDebt = 0;         // dette d'âmes à rembourser (mensonge sur les âmes)
@@ -48,6 +49,9 @@ class Game {
     // Être démoniaque). PERSISTANT : renforce les PV des entités du monde à
     // chaque complétion. { normal, cieux, enfers }
     this.worldClears = { normal: 0, cieux: 0, enfers: 0 };
+    // Bestiaire : nombre d'entités détruites par type, cumulé à vie (jamais
+    // remis à zéro au prestige, seulement à la réinitialisation totale).
+    this.kills = {};
 
     // Épreuve « Fin du Monde » en cours (transitoire, jamais reprise) :
     // { stage, total } quand active, sinon null.
@@ -124,6 +128,7 @@ class Game {
       incomeSamples: this.incomeSamples,
       totalDestroyed: this.totalDestroyed,
       bestLevel: this.bestLevel,
+      kills: this.kills,
       run: null,
     };
     // On enregistre la partie en cours pour pouvoir la reprendre à l'identique.
@@ -136,6 +141,7 @@ class Game {
         runDestroyed: this.runDestroyed,
         runSouls: this.runSouls,
         totalToDestroy: this.totalToDestroy,
+        faustId: this.faustId,
         targets: this.targets
           .filter(t => !t.dead)
           .map(t => ({ gx: t.gx, gy: t.gy, typeId: t.typeId, hp: t.hp, maxHp: t.maxHp, value: t.value })),
@@ -198,6 +204,7 @@ class Game {
     this.incomeSamples = Array.isArray(d.incomeSamples) ? d.incomeSamples : [];
     this.totalDestroyed = d.totalDestroyed || 0;
     this.bestLevel = d.bestLevel || 1;
+    this.kills = (d.kills && typeof d.kills === 'object') ? d.kills : {};
     this.worldEnd = null; // une épreuve en cours ne survit pas à un rechargement
     this.pendingRun = (d.run && d.run.targets && d.run.targets.length) ? d.run : null;
     return true;
@@ -223,10 +230,11 @@ class Game {
     this.virtuesDefeated = {};
     this.prestigePoints = 0; this.prestigeUpgrades = {}; this.prestigeCount = 0;
     this.everBought = {}; this.prestigeHistory = []; this.cycleRavagesStart = 0;
-    this.incarnation = null; this.lie = null; this.lieMalus = null;
+    this.incarnation = null; this.faustId = null; this.lie = null; this.lieMalus = null;
     this.soulDebt = 0; this.pendingPrestigeBonus = 0; this.lastLieResult = null;
     this.worldEndCyclePoints = 0; this.incomeSamples = [];
     this.totalDestroyed = 0; this.bestLevel = 1;
+    this.kills = {};
     this.worldEnd = null;
     this.pendingRun = null;
     this.phase = 'idle';
@@ -400,6 +408,7 @@ class Game {
     this.offerings = {};
     this.virtuesDefeated = {};
     this.lie = null; this.lieMalus = null; this.soulDebt = 0;
+    this.faustId = null;
     this.lastLieResult = null; // le verdict du cycle précédent ne doit pas persister
     this.pendingRun = null;
     this.phase = 'idle';
@@ -416,8 +425,8 @@ class Game {
     const inc = INCARNATIONS.find(i => i.id === id);
     if (!inc || !inc.available || !this.canIncarnate()) return false;
     this.incarnation = id;
-    // Changer d'incarnation annule un mensonge en cours.
-    this.lie = null; this.lieMalus = null;
+    // Changer d'incarnation annule un mensonge en cours et tout pacte faustien.
+    this.lie = null; this.lieMalus = null; this.faustId = null;
     // Astaroth bannit le Serment du Chaos : s'il était déjà scellé, on en
     // rembourse la moitié et on le retire (l'exclusivité des voies redevient
     // absolue → une seule voie possible).
@@ -444,6 +453,38 @@ class Game {
     for (const v of ['voie_magie', 'voie_legion', 'voie_clic'])
       if (this.upgradeLevel(v) >= 1) return v;
     return null;
+  }
+
+  /* ---------------------- Pacte faustien (Méphisto) ---------------------- */
+  /* Méphisto est-il incarné ? (mécanique du choix de pacte à chaque niveau). */
+  isMephisto() { return this.incarnation === 'mephisto'; }
+
+  /* Les 3 pactes proposés pour un niveau donné. Tirage DÉTERMINISTE dérivé de
+   * la graine + du niveau : un même niveau propose toujours les mêmes 3 pactes,
+   * dans le même ordre, sur tout appareil. */
+  faustOffers(level = this.level) {
+    const rng = seededRandom(this.seed, level, FAUST_SALT);
+    const pool = FAUST_PACTS.slice();
+    // Mélange de Fisher-Yates piloté par le générateur à graine.
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    return pool.slice(0, 3);
+  }
+
+  /* Le pacte faustien actif pour le niveau en cours (ou null). */
+  faustPact() {
+    if (!this.isMephisto() || !this.faustId) return null;
+    return FAUST_PACTS.find(p => p.id === this.faustId) || null;
+  }
+
+  /* Scelle le pacte choisi pour le niveau en cours (doit faire partie des offres). */
+  chooseFaust(id) {
+    if (!this.isMephisto()) return false;
+    if (!this.faustOffers().some(p => p.id === id)) return false;
+    this.faustId = id;
+    return true;
   }
 
   /* ---------------------- Mensonge de Belial ---------------------- */
@@ -748,6 +789,8 @@ class Game {
     if (this.lieMalus && typeof s[this.lieMalus.target] === 'number')
       src('Mensonge démasqué', '⛓️', () => { s[this.lieMalus.target] /= this.lieMalus.factor; });
     this.applyServantBase(s);
+    const fp = this.faustPact();
+    if (fp) src('Pacte : ' + fp.name, fp.emoji, () => fp.apply(s));
     return { stats: s, contribs };
   }
 
@@ -783,8 +826,15 @@ class Game {
       s[this.lieMalus.target] /= this.lieMalus.factor;
     }
     this.applyServantBase(s);
+    // Pacte faustien de Méphisto (valable pour le niveau en cours) : appliqué en
+    // tout dernier, APRÈS la base des serviteurs — les serviteurs conservent leur
+    // échelle d'avant-pacte, le marché ne touche que le démon (et ses sorts).
+    const fp = this.faustPact();
+    if (fp) fp.apply(s);
     // Le clic infernal n'est actif qu'une fois le pacte Clic Cataclysmique pris.
     s.clickUnlocked = this.upgradeLevel('cataclysme') > 0;
+    if (fp && fp.forceClic) s.clickUnlocked = true;   // Pacte de la Griffe : débloque le clic
+    if (fp && fp.noClic) s.clickUnlocked = false;      // certains marchés interdisent le clic
     const prevMax = this.stats ? this.stats.lifespan : s.lifespan;
     this.stats = s;
     if (resetLifespan) this.timeLeft = s.lifespan;
@@ -899,6 +949,8 @@ class Game {
     // Renforcement cumulatif : chaque fois que ce monde a été bouclé, ses entités
     // gagnent en PV (New Game+ par monde).
     hpMult *= 1 + (this.worldClears[this.world] || 0) * WORLD_CLEAR_HP;
+    // Contrepartie d'un pacte faustien qui durcit les entités (Méphisto).
+    if (this.isMephisto()) { const fp = this.faustPact(); if (fp && fp.hpMult) hpMult *= fp.hpMult; }
     const valMult = 1 + (diffLevel - 1) * 0.28;
     const density = Math.min(0.72, 0.42 + level * 0.02);
     const boss = opts.forceBoss || isBossLevel(level);
@@ -1293,6 +1345,7 @@ class Game {
     if (!r) { return this.startRun(); }
     this.pendingRun = null;
     this.level = r.level || this.level;
+    this.faustId = r.faustId || null; // restaure le pacte faustien du niveau repris
     this.computeStats(false);
     this.buildRunState(r.gridSize, r.targets, r.scorched);
     this.totalToDestroy = r.totalToDestroy || (this.targets.length + (r.runDestroyed || 0));
@@ -2024,6 +2077,7 @@ class Game {
     this.runSouls += gain;
     this.runDestroyed++;
     this.totalDestroyed++;
+    if (t.typeId) this.kills[t.typeId] = (this.kills[t.typeId] || 0) + 1; // bestiaire
     // Mensonge sur les âmes : on comptabilise ce qui est réellement récolté.
     if (this.lie && this.lie.target === 'souls') this.lie.soulsEarned += gain;
     // Convoitise du Sacré (Léviathan) : exorciser un prêtre te rend du temps.
@@ -2217,6 +2271,9 @@ class Game {
     } else {
       this.phase = 'exorcised';
     }
+    // Le pacte faustien ne vaut que pour le niveau écoulé : on le libère pour que
+    // le prochain niveau propose (et exige) un nouveau choix.
+    this.faustId = null;
     this.save();
     this.onChange();
     this.onEnd(result);
