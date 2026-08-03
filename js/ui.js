@@ -158,6 +158,22 @@ class UI {
       if (e.target.id === 'stats-modal') this.closeStats();
     });
 
+    // --- Bestiaire : entités détruites cumulées ---
+    this.$('bestiary-btn').addEventListener('click', () => this.openBestiary());
+    this.$('bestiary-close').addEventListener('click', () => this.closeBestiary());
+    this.$('bestiary-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'bestiary-modal') this.closeBestiary();
+    });
+
+    // --- Pacte faustien de Méphisto : clic sur le fond = renoncer ---
+    this.$('faust-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'faust-modal') this.cancelFaust();
+    });
+
+    // --- Raccourcis clavier : sorts actifs sur les chiffres 1..9 (rangée du
+    // haut, au-dessus des lettres — event.code Digit1..Digit9, pas le pavé). ---
+    window.addEventListener('keydown', (e) => this.onHotkey(e));
+
     // --- Menu Options / sauvegarde ---
     this.$('menu-btn').addEventListener('click', () => this.openMenu());
     this.$('menu-close').addEventListener('click', () => this.closeMenu());
@@ -208,11 +224,57 @@ class UI {
   }
 
   startRun() {
+    // Méphisto : on scelle d'abord un pacte faustien pour le niveau à venir.
+    if (this.game.isMephisto()) {
+      const offers = this.game.faustOffers();
+      if (this.autoPlay) {
+        // Enchaînement automatique : on prend le premier pacte proposé.
+        this.game.chooseFaust(offers[0].id);
+      } else {
+        this.openFaust(offers);
+        return; // la partie démarrera au choix du pacte
+      }
+    }
+    this._enterRun();
+  }
+
+  /* Entrée effective dans le niveau (après un éventuel choix de pacte). */
+  _enterRun() {
     this.$('start-screen').classList.add('hidden');
+    this.$('faust-modal').classList.add('hidden');
     this.tryLockLandscape();
     this.setView('game');
     this.game.startRun();
     this.refresh();
+  }
+
+  /* Écran de choix du pacte faustien (Méphisto) : 3 marchés liés à la graine. */
+  openFaust(offers) {
+    const g = this.game;
+    this.$('start-screen').classList.add('hidden');
+    this.$('overlay').classList.add('hidden');
+    this.$('faust-level').textContent = 'Niveau ' + g.level;
+    const body = this.$('faust-body');
+    body.innerHTML = '';
+    offers.forEach((p) => {
+      const card = document.createElement('button');
+      card.className = 'faust-card';
+      card.innerHTML =
+        `<span class="fc-emoji">${p.emoji}</span>` +
+        `<span class="fc-name">${p.name}</span>` +
+        `<span class="fc-boon">✦ ${p.boon}</span>` +
+        `<span class="fc-bane">✕ ${p.bane}</span>`;
+      card.addEventListener('click', () => {
+        if (g.chooseFaust(p.id)) this._enterRun();
+      });
+      body.appendChild(card);
+    });
+    this.$('faust-modal').classList.remove('hidden');
+  }
+  /* Renonce au choix (clic sur le fond) : retour à l'écran d'accueil. */
+  cancelFaust() {
+    this.$('faust-modal').classList.add('hidden');
+    this.showStartScreen();
   }
 
   resumeRun() {
@@ -409,6 +471,40 @@ class UI {
   /* ---------------------- Statistiques cumulées (📊) ---------------------- */
   openStats() { this.renderStats(); this.$('stats-modal').classList.remove('hidden'); }
   closeStats() { this.$('stats-modal').classList.add('hidden'); }
+
+  /* ---------------------- Bestiaire ---------------------- */
+  openBestiary() { this.renderBestiary(); this.$('bestiary-modal').classList.remove('hidden'); }
+  closeBestiary() { this.$('bestiary-modal').classList.add('hidden'); }
+
+  renderBestiary() {
+    const g = this.game;
+    const body = this.$('bestiary-body');
+    // On parcourt les types dans l'ordre du config ; seuls ceux déjà détruits
+    // au moins une fois apparaissent.
+    const entries = Object.keys(TARGET_TYPES)
+      .filter((id) => (g.kills[id] || 0) > 0)
+      .map((id) => ({ id, def: TARGET_TYPES[id], n: g.kills[id] }));
+    let total = 0;
+    for (const e of entries) total += e.n;
+
+    if (!entries.length) {
+      body.innerHTML = `<p class="bestiary-empty">Aucune entité détruite… pour l'instant. 😈</p>`;
+      return;
+    }
+    // Les plus massacrés en tête.
+    entries.sort((a, b) => b.n - a.n);
+    let html = `<div class="stat-group">💀 ${this.fmt(total)} entités anéanties · ${entries.length} espèces</div>`;
+    html += '<div class="bestiary-grid">';
+    for (const e of entries) {
+      html += `<div class="bestiary-item">
+        <span class="be-emoji">${e.def.emoji}</span>
+        <span class="be-name">${e.def.name}</span>
+        <span class="be-count">${this.fmt(e.n)}</span>
+      </div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  }
 
   /* Formate une valeur de stat selon son type. */
   fmtStatVal(type, v) {
@@ -1248,22 +1344,58 @@ class UI {
   }
 
   /* ---------------------- Sorts actifs (boutons en jeu) ---------------------- */
+
+  /* Liste ordonnée des sorts actifs possédés (uniquement en partie). L'ordre
+   * fixe la correspondance des raccourcis clavier 1..9. */
+  ownedAbilities() {
+    const g = this.game;
+    return (g.phase === 'playing')
+      ? UPGRADES.filter((u) => u.active && g.upgradeLevel(u.id) > 0) : [];
+  }
+
+  /* Raccourci clavier : les chiffres de la rangée du haut (Digit1..Digit9,
+   * au-dessus des lettres — jamais le pavé numérique) lancent le Nᵉ sort. */
+  onHotkey(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    const m = /^Digit([1-9])$/.exec(e.code || '');
+    if (!m) return;
+    // Choix du pacte faustien au clavier quand l'écran de Méphisto est ouvert.
+    if (!this.$('faust-modal').classList.contains('hidden')) {
+      const cards = this.$('faust-body').querySelectorAll('.faust-card');
+      const card = cards[Number(m[1]) - 1];
+      if (card) { e.preventDefault(); card.click(); }
+      return;
+    }
+    const owned = this.ownedAbilities();
+    const def = owned[Number(m[1]) - 1];
+    if (!def) return;
+    e.preventDefault();
+    if (this.game.activateAbility(def.id)) {
+      const b = this.$('abilities').querySelector(`[data-id="${def.id}"]`);
+      if (b) { b.classList.add('cast'); setTimeout(() => b.classList.remove('cast'), 200); }
+      this.refreshAbilities();
+    }
+  }
+
   refreshAbilities() {
     const box = this.$('abilities');
     const g = this.game;
     // Sorts possédés, uniquement pendant une partie active.
-    const owned = (g.phase === 'playing')
-      ? UPGRADES.filter((u) => u.active && g.upgradeLevel(u.id) > 0) : [];
+    const owned = this.ownedAbilities();
     const ids = owned.map((u) => u.id).join(',');
     if (box.dataset.ids !== ids) {
       box.dataset.ids = ids;
       box.innerHTML = '';
-      for (const def of owned) {
+      owned.forEach((def, i) => {
         const b = document.createElement('button');
         b.className = 'ability-btn';
         b.dataset.id = def.id;
-        b.title = def.name;
-        b.innerHTML = `<span class="ab-emoji">${def.emoji}</span><span class="ab-cd"></span>`;
+        // Raccourci clavier associé (rangée du haut) pour les 9 premiers sorts.
+        const key = i < 9 ? `<span class="ab-key">${i + 1}</span>` : '';
+        b.title = i < 9 ? `${def.name} (touche ${i + 1})` : def.name;
+        b.innerHTML = `${key}<span class="ab-emoji">${def.emoji}</span><span class="ab-cd"></span>`;
         b.addEventListener('click', () => {
           if (g.activateAbility(def.id)) {
             b.classList.add('cast');
@@ -1272,7 +1404,7 @@ class UI {
           }
         });
         box.appendChild(b);
-      }
+      });
     }
     // Recharge / disponibilité.
     for (const def of owned) {

@@ -63,6 +63,7 @@
         <button id="skip-btn" class="icon-btn" title="Passer 10 niveaux (test) — atteins le Prestige plus vite">⏭️</button>
         <button id="world-btn" class="icon-btn" title="Changer de monde de test (Normal → Cieux → Enfers)">🌍</button>
         <button id="stats-btn" class="icon-btn" title="Statistiques cumulées">📊</button>
+        <button id="bestiary-btn" class="icon-btn" title="Bestiaire — entités détruites">📖</button>
         <button id="auto-btn" class="icon-btn" title="Enchaînement automatique des niveaux">🔁</button>
         <button id="music-btn" class="icon-btn" title="Musique métal">🎵</button>
         <button id="menu-btn" class="icon-btn" title="Options">⚙️</button>
@@ -270,6 +271,28 @@
         <h2>📊 Statistiques cumulées</h2>
         <p class="stats-sub">Survole (ou touche) une statistique pour voir d'où vient chaque boost.</p>
         <div id="stats-body"></div>
+      </div>
+    </div>
+
+    <!-- Bestiaire : entités détruites cumulées, par type -->
+    <div id="bestiary-modal" class="hidden">
+      <div class="stats-card">
+        <button id="bestiary-close" class="menu-close" title="Fermer">✕</button>
+        <h2>📖 Bestiaire</h2>
+        <p class="stats-sub">Tout ce que ton démon a réduit en poussière, compté par espèce.</p>
+        <div id="bestiary-body"></div>
+      </div>
+    </div>
+
+    <!-- Pacte faustien de Méphisto : choix de 3 marchés au début du niveau -->
+    <div id="faust-modal" class="hidden">
+      <div class="faust-card-wrap">
+        <div class="faust-head">
+          <span class="faust-emoji">📜</span>
+          <h2>Le Pacte de Méphisto</h2>
+          <p class="faust-sub">Scelle un marché pour ce niveau — <span id="faust-level"></span></p>
+        </div>
+        <div id="faust-body" class="faust-grid"></div>
       </div>
     </div>
 
