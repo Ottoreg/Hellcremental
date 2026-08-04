@@ -228,8 +228,9 @@ class UI {
     if (this.game.isMephisto()) {
       const offers = this.game.faustOffers();
       if (this.autoPlay) {
-        // Enchaînement automatique : on prend le premier pacte proposé.
-        this.game.chooseFaust(offers[0].id);
+        // Enchaînement automatique : on scelle un pacte AU HASARD parmi les 3.
+        const pick = offers[Math.floor(Math.random() * offers.length)];
+        this.game.chooseFaust(pick.id);
       } else {
         this.openFaust(offers);
         return; // la partie démarrera au choix du pacte
