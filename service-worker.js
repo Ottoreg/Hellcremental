@@ -6,7 +6,7 @@
 
 // Version du cache : à INCRÉMENTER à chaque déploiement pour forcer la mise à
 // jour des applications déjà installées (l'ancien cache est purgé à l'activation).
-const CACHE = 'hellcremental-v5';
+const CACHE = 'hellcremental-v6';
 
 const ASSETS = [
   './',
