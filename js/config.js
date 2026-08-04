@@ -746,8 +746,8 @@ const PRIMORDIAL_DEMONS = [
   {
     id: 'colere', sin: 'Colère', name: 'Satan', emoji: '👿', color: '#e8442b',
     pact: 'Fureur Déchaînée',
-    desc: 'Une rage aveugle t\'anime : +90% de vitesse de déplacement et +40% de dégâts.',
-    apply: (s) => { s.moveSpeed *= 1.9; s.damage *= 1.4; },
+    desc: 'Ta rage guide ta griffe : +30 % de dégâts de clic.',
+    apply: (s) => { s.clickDamage *= 1.3; },
   },
   {
     id: 'paresse', sin: 'Paresse', name: 'Belphégor', emoji: '🦥', color: '#6a8caf',
