@@ -597,17 +597,26 @@ class UI {
     // Incarnation d'un démon primordial (après ≥1 prestige).
     const inc = this.$('prestige-incarnation');
     if (g.canIncarnate()) {
+      // Le choix n'est modifiable qu'avant d'avoir bouclé le 1er niveau du cycle.
+      const changeLocked = !g.canChangeIncarnation();
       const cards = INCARNATIONS.map((d) => {
         const chosen = g.incarnation === d.id;
         const lockable = !d.available;
+        const btnDisabled = !d.available || chosen || changeLocked;
+        const label = chosen ? '✓ Incarné'
+          : (!d.available ? '🔒 À venir' : (changeLocked ? '🔒 Verrouillé' : 'Incarner'));
         return `<div class="inc-item ${chosen ? 'chosen' : ''} ${lockable ? 'locked' : ''}" style="--inc:${d.color}">
           <div class="inc-emoji">${d.emoji}</div>
           <div class="inc-name">${d.name}</div>
           <div class="inc-title">${d.title}</div>
-          <button class="inc-btn" data-id="${d.id}" ${(!d.available || chosen) ? 'disabled' : ''}>
-            ${chosen ? '✓ Incarné' : (d.available ? 'Incarner' : '🔒 À venir')}</button>
+          <button class="inc-btn" data-id="${d.id}" ${btnDisabled ? 'disabled' : ''}>
+            ${label}</button>
         </div>`;
       }).join('');
+      // Bandeau d'explication du verrou une fois le 1er niveau du cycle terminé.
+      const lockNote = changeLocked
+        ? `<p class="inc-lock-note">🔒 L'incarnation est scellée pour ce cycle — tu ne peux plus en changer avant de renaître (prestige).</p>`
+        : '';
       // Note explicative de l'incarnation choisie (quelle qu'elle soit).
       let incNote = '';
       const chosenInc = INCARNATIONS.find((d) => d.id === g.incarnation);
@@ -626,7 +635,7 @@ class UI {
         incNote += `</div>`;
       }
       inc.innerHTML = `<h3 class="inc-head">👺 Incarner un Démon Primordial</h3>
-        <div class="inc-grid">${cards}</div>${incNote}`;
+        <div class="inc-grid">${cards}</div>${lockNote}${incNote}`;
       inc.querySelectorAll('.inc-btn').forEach((b) => b.addEventListener('click', () => {
         if (g.setIncarnation(b.dataset.id)) { this.renderPrestige(); this.refresh(); }
       }));
