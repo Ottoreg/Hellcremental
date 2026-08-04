@@ -421,9 +421,13 @@ class Game {
   /* ---------------------- Incarnation (démon primordial) ---------------------- */
   /* Le choix d'incarnation s'ouvre après avoir prestigé au moins une fois. */
   canIncarnate() { return this.prestigeCount >= 1; }
+  /* On ne peut (ré)incarner qu'AVANT d'avoir terminé le premier niveau du cycle
+   * de prestige en cours : dès que le niveau 1 est bouclé (level > 1), le choix
+   * est verrouillé jusqu'au prochain prestige. */
+  canChangeIncarnation() { return this.canIncarnate() && this.level <= 1; }
   setIncarnation(id) {
     const inc = INCARNATIONS.find(i => i.id === id);
-    if (!inc || !inc.available || !this.canIncarnate()) return false;
+    if (!inc || !inc.available || !this.canChangeIncarnation()) return false;
     this.incarnation = id;
     // Changer d'incarnation annule un mensonge en cours et tout pacte faustien.
     this.lie = null; this.lieMalus = null; this.faustId = null;

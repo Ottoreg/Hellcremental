@@ -899,6 +899,11 @@ html, body {
   font-size: 12px; color: #f0d79a; line-height: 1.5;
 }
 .inc-asta b { color: #ffe6a8; }
+.inc-lock-note {
+  margin: 8px 0 4px; padding: 9px 12px; border-radius: 10px;
+  background: rgba(180,120,120,.1); border: 1px solid rgba(200,120,120,.4);
+  font-size: 12px; color: #e0b0b0; line-height: 1.5;
+}
 .inc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 6px; }
 .inc-item {
   background: rgba(20,10,26,.7); border: 1px solid #3a2450; border-radius: 12px;
