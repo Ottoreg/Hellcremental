@@ -43,8 +43,11 @@ class Game {
     // La courbe de difficulté reste identique quel que soit le monde.
     this.world = 'normal';
     this.worldEndWins = 0;     // nombre de Fin du Monde remportées à vie (texte du 1er choix)
-    this.worldEndDone = false; // Fin du Monde gagnée CE CYCLE (remis à zéro au prestige) : ouvre les campagnes
+    this.worldEndDone = false; // Fin du Monde gagnée CE CYCLE (remis à zéro au prestige)
     this.campaignsWon = {};    // campagnes terminées CE CYCLE de prestige (remis à zéro au prestige) : bloque à 1×/prestige
+    // Campagne d'endgame ENGAGÉE mais pas encore terminée (Être ultime pas battu) :
+    // tant qu'elle n'est pas finie, l'autre campagne reste verrouillée. null sinon.
+    this.activeCampaign = null;
     // Nombre de fois que chaque monde a été « bouclé » (7 Vertus / Être divin /
     // Être démoniaque). PERSISTANT : renforce les PV des entités du monde à
     // chaque complétion. { normal, cieux, enfers }
@@ -107,6 +110,7 @@ class Game {
       worldEndWins: this.worldEndWins,
       worldEndDone: this.worldEndDone,
       campaignsWon: this.campaignsWon,
+      activeCampaign: this.activeCampaign,
       worldClears: this.worldClears,
       souls: this.souls,
       level: this.level,
@@ -181,6 +185,7 @@ class Game {
     this.worldEndWins = d.worldEndWins || 0;
     this.worldEndDone = !!d.worldEndDone;
     this.campaignsWon = d.campaignsWon || {};
+    this.activeCampaign = (d.activeCampaign && WORLDS[d.activeCampaign]) ? d.activeCampaign : null;
     this.worldClears = Object.assign({ normal: 0, cieux: 0, enfers: 0 }, d.worldClears || {});
     this.souls = d.souls || 0;
     this.level = d.level || 1;
@@ -225,6 +230,7 @@ class Game {
     this.seed = makeSeed();
     this.world = 'normal';
     this.worldEndWins = 0; this.worldEndDone = false; this.campaignsWon = {};
+    this.activeCampaign = null;
     this.worldClears = { normal: 0, cieux: 0, enfers: 0 };
     this.souls = 0; this.level = 1; this.upgrades = {}; this.offerings = {};
     this.virtuesDefeated = {};
@@ -401,6 +407,7 @@ class Game {
     // doivent être re-débloquées (seul worldClears — la difficulté — persiste).
     this.worldEndDone = false;
     this.campaignsWon = {};  // les campagnes redeviennent faisables (1×/prestige)
+    this.activeCampaign = null; // plus aucune campagne engagée
     this.world = 'normal';   // le prestige ramène toujours dans le monde normal
     this.souls = 0;
     this.level = 1;
@@ -1427,19 +1434,26 @@ class Game {
   }
 
   /* ---------------------- Campagnes d'endgame (Cieux / Enfers) ---------------------- */
-  /* Le choix Blasphème/Trahison est disponible une fois la Fin du Monde gagnée
-   * CE CYCLE de prestige (il faut la re-gagner après chaque prestige). */
-  canEndgame() { return !!this.worldEndDone; }
+  /* Le choix Blasphème/Trahison est disponible dès que les 7 Vertus (70 premiers
+   * niveaux) sont vaincues — indépendamment de la Fin du Monde. */
+  canEndgame() { return this.allVirtuesDefeated(); }
 
-  /* Une campagne est-elle encore faisable ce cycle ? (1×/prestige) */
+  /* Une campagne est-elle encore faisable ce cycle ?
+   *  - 1×/prestige (pas déjà remportée) ;
+   *  - une seule campagne à la fois : tant qu'une campagne engagée n'est pas
+   *    terminée (Être ultime battu), l'AUTRE reste verrouillée. On choisit donc
+   *    d'abord l'une, on la finit, puis on peut faire l'autre. */
   campaignAvailable(world) {
-    return this.canEndgame() && world !== 'normal' && !!WORLDS[world] && !this.campaignsWon[world];
+    return this.canEndgame() && world !== 'normal' && !!WORLDS[world]
+      && !this.campaignsWon[world]
+      && (!this.activeCampaign || this.activeCampaign === world);
   }
 
   /* Lance une campagne d'endgame : 70 niveaux thématiques + boss ultime au 71.
-   * Bloquée si déjà remportée ce cycle de prestige. */
+   * Bloquée si déjà remportée ce cycle, ou si l'autre campagne est en cours. */
   startCampaign(world) {
     if (!this.campaignAvailable(world)) return false;
+    this.activeCampaign = world;   // campagne engagée : verrouille l'autre
     this.world = world;
     this.level = 1;
     this.worldEnd = null;
@@ -1456,6 +1470,7 @@ class Game {
     const world = this.world;
     const def = this.worldDef();
     this.campaignsWon[world] = true;                       // bloque jusqu'au prochain prestige
+    this.activeCampaign = null;                            // campagne terminée : l'autre se débloque
     this.worldClears[world] = (this.worldClears[world] || 0) + 1; // renforce les PV du monde
     this.prestigePoints += CAMPAIGN_REWARD;
     const result = {
