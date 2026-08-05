@@ -114,29 +114,6 @@ class UI {
       this.setView('shop'); this.refresh();
     });
 
-    // --- Bouton de test temporaire : +âmes ---
-    this.$('cheat-btn').addEventListener('click', () => {
-      this.game.souls += 1e9;
-      this.game.save();
-      this.refresh();
-    });
-    // [DEV/TEST] Passer 10 niveaux d'un coup (marque les Vertus traversées).
-    this.$('skip-btn').addEventListener('click', () => {
-      this.game.devSkipLevels(10);
-      this.refresh();
-    });
-    // [DEV/TEST] Cycler le monde de test : Normal → Cieux → Enfers, en
-    // redémarrant une partie fraîche au niveau 1 dans ce monde.
-    this.$('world-btn').addEventListener('click', () => {
-      this.$('start-screen').classList.add('hidden');
-      this.$('overlay').classList.add('hidden'); // ferme un éventuel écran de fin
-      this._resultWasWorldEnd = false;
-      this.tryLockLandscape();
-      this.setView('game');
-      this.game.devCycleWorld();
-      this.refresh();
-    });
-
     // --- Boutique Démoniaque (Prestige) ---
     this.$('prestige-btn').addEventListener('click', () => this.openPrestige());
     this.$('prestige-close').addEventListener('click', () => this.closePrestige());
@@ -315,6 +292,7 @@ class UI {
 
   /* Lance une campagne d'endgame (Cieux = Blasphème, Enfers = Trahison). */
   startCampaign(world) {
+    if (!this.game.campaignAvailable(world)) return; // verrouillée : on ignore
     this.$('start-screen').classList.add('hidden');
     this.$('prestige-modal').classList.add('hidden');
     this.$('overlay').classList.add('hidden');
@@ -362,14 +340,20 @@ class UI {
     if (g.canWorldEnd()) {
       worldEnd = `<button id="vt-worldend-btn" class="vt-worldend-btn">🌍 Fin du Monde — les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</button>`;
     }
-    // Campagnes d'endgame : débloquées après une 1re victoire en Fin du Monde.
+    // Campagnes d'endgame : débloquées dès les 7 Vertus vaincues. On en choisit
+    // une, on la termine (Être ultime), puis l'autre se débloque — 1× chacune.
     let endgame = '';
     if (g.canEndgame()) {
-      const c = g.campaignsWon || {};
+      const egBtn = (world, cls, label) => {
+        const won = !!g.campaignsWon[world];
+        const avail = g.campaignAvailable(world);
+        const suffix = won ? ' ✓' : (avail ? '' : ' 🔒');
+        return `<button class="vt-eg-btn ${cls}" data-world="${world}"${avail ? '' : ' disabled'}>${label}${suffix}</button>`;
+      };
       endgame =
         `<div class="vt-endgame">` +
-        `<button class="vt-eg-btn eg-cieux" data-world="cieux"${c.cieux ? ' disabled' : ''}>☁️ Blasphème — Détruire les Cieux${c.cieux ? ' ✓' : ''}</button>` +
-        `<button class="vt-eg-btn eg-enfers" data-world="enfers"${c.enfers ? ' disabled' : ''}>🔥 Trahison — Détruire les Enfers${c.enfers ? ' ✓' : ''}</button>` +
+        egBtn('cieux', 'eg-cieux', '☁️ Blasphème — Détruire les Cieux') +
+        egBtn('enfers', 'eg-enfers', '🔥 Trahison — Détruire les Enfers') +
         `</div>`;
     }
     el.innerHTML = `<div class="vt-title">⚜️ Vertus vaincues — ${done}/${VIRTUES.length}</div>` +
@@ -1713,8 +1697,14 @@ class UI {
       `<div class="ov-endgame-btns">` +
       `<button class="ov-eg-btn eg-worldend" data-act="worldend">🌍 Fin du Monde<small>Les 7 Vertus d'affilée · +${WORLDEND_REWARD} pts</small></button>`;
     if (g.canEndgame()) {
-      html += `<button class="ov-eg-btn eg-cieux" data-act="cieux"${c.cieux ? ' disabled' : ''}>☁️ Blasphème<small>${c.cieux ? 'Accompli ✓' : 'Détruis les Cieux'}</small></button>` +
-        `<button class="ov-eg-btn eg-enfers" data-act="enfers"${c.enfers ? ' disabled' : ''}>🔥 Trahison<small>${c.enfers ? 'Accompli ✓' : 'Détruis les Enfers'}</small></button>`;
+      const egBtn = (world, cls, emoji, name, verb) => {
+        const won = !!c[world];
+        const avail = g.campaignAvailable(world);
+        const sub = won ? 'Accompli ✓' : (avail ? verb : '🔒 Termine l\'autre d\'abord');
+        return `<button class="ov-eg-btn ${cls}" data-act="${world}"${avail ? '' : ' disabled'}>${emoji} ${name}<small>${sub}</small></button>`;
+      };
+      html += egBtn('cieux', 'eg-cieux', '☁️', 'Blasphème', 'Détruis les Cieux') +
+        egBtn('enfers', 'eg-enfers', '🔥', 'Trahison', 'Détruis les Enfers');
     }
     html += `</div>`;
     wrap.innerHTML = html;
