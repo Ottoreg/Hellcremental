@@ -1220,15 +1220,22 @@ class UI {
           return;
         }
       }
-      // 3) Sinon : prérequis (pacte parent) réellement manquant.
+      // 3) Sinon : prérequis (pacte parent) réellement manquant. Certains pactes
+      // bonus exigent leurs deux prérequis à un niveau minimum (reqLvl).
+      const needLvl = (node && node.reqAll && node.reqLvl) ? node.reqLvl : 1;
       const missing = g.prereqIds(def.id)
-        .filter((pid) => g.upgradeLevel(pid) < 1)
+        .filter((pid) => g.upgradeLevel(pid) < needLvl)
         .map((pid) => (UPGRADES.find((u) => u.id === pid) || {}).name)
         .filter(Boolean);
       const pname = missing.length ? missing.map((n) => `« ${n} »`).join(' et ') : 'le pacte précédent';
-      eff.innerHTML = `<span class="nxt">🔒 Invoque d'abord ${pname} pour débloquer ce pacte.</span>`;
+      if (needLvl > 1) {
+        eff.innerHTML = `<span class="nxt">🔒 Monte ${pname} au niveau ${needLvl} pour débloquer ce pacte.</span>`;
+        buy.textContent = `🔒 Nécessite ${pname} niv. ${needLvl}`;
+      } else {
+        eff.innerHTML = `<span class="nxt">🔒 Invoque d'abord ${pname} pour débloquer ce pacte.</span>`;
+        buy.textContent = `🔒 Nécessite ${pname}`;
+      }
       buy.disabled = true;
-      buy.textContent = `🔒 Nécessite ${pname}`;
       return;
     }
 

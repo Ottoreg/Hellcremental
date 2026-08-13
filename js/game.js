@@ -695,8 +695,9 @@ class Game {
     }
     // Certains pactes exigent une voie précise (ex. buffs de serviteurs -> Légions).
     if (node.reqVoie && this.upgradeLevel(node.reqVoie) < 1) return false;
-    // Prérequis multiples : TOUS les pactes de reqAll doivent être achetés.
-    if (node.reqAll) return node.reqAll.every(pid => this.upgradeLevel(pid) >= 1);
+    // Prérequis multiples : TOUS les pactes de reqAll doivent atteindre le niveau
+    // requis (reqLvl, 1 par défaut — 5 pour les pactes bonus des serviteurs).
+    if (node.reqAll) { const need = node.reqLvl || 1; return node.reqAll.every(pid => this.upgradeLevel(pid) >= need); }
     const parent = node.parent;
     if (!parent || parent === 'root') return true;
     return this.upgradeLevel(parent) >= (node.req || 1);
