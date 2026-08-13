@@ -885,7 +885,7 @@ class Game {
     const servants = minions + colosse + vagabonds + foudroyeurs;
     const spells = [];
     if (s.foudre > 0) spells.push({ name: 'Foudre (par frappe)',
-      val: Math.round(s.damage * (4 + s.foudre * 1.5) * (1 + s.foudreDmg) * (1 + s.powerDmg)) });
+      val: Math.round(s.damage * (2 + s.foudre * 0.8) * (1 + s.foudreDmg) * (1 + s.powerDmg)) });
     if (s.meteore > 0) spells.push({ name: 'Météore (par case)',
       val: Math.round(s.damage * (8 + s.meteore * 2) * (1 + s.powerDmg)) });
     if (s.clickUnlocked) spells.push({ name: 'Clic infernal', val: Math.round(s.clickDamage) });
@@ -956,7 +956,7 @@ class Game {
     // Monde (niveaux effectifs > 70). Les CAMPAGNES en sont exemptées et gardent
     // une montée LINÉAIRE — l'ancrage au niveau 70 suffit à les durcir, et la
     // double exponentielle rendait toute campagne infaisable (facteur ×17).
-    if (diffLevel > 70 && !isCampaign) hpMult *= 2 + (diffLevel - 71) * 0.1;
+    if (diffLevel > 70 && !isCampaign) hpMult *= 2 + (diffLevel - 71) * 0.2;
     // Renforcement cumulatif : chaque fois que ce monde a été bouclé, ses entités
     // gagnent en PV (New Game+ par monde).
     hpMult *= 1 + (this.worldClears[this.world] || 0) * WORLD_CLEAR_HP;
@@ -1282,7 +1282,7 @@ class Game {
     const s = this.stats;
     const n = Math.max(1, s.foudre);
     const strikes = 2 + n;
-    const dmg = Math.round(s.damage * (4 + n * 1.5) * (1 + s.foudreDmg) * (1 + s.powerDmg));
+    const dmg = Math.round(s.damage * (2 + n * 0.8) * (1 + s.foudreDmg) * (1 + s.powerDmg));
     const alive = this.targets.filter(t => !t.dead);
     for (let i = 0; i < strikes && alive.length; i++) {
       const idx = Math.floor(Math.random() * alive.length);
