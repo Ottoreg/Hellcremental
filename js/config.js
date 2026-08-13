@@ -85,13 +85,13 @@ const VIRTUES = [
   // NB : emojis à un seul codepoint (pas de sélecteur VS16) pour un rendu
   // centré fiable sur tous les navigateurs (les séquences VS16 comme 🕊️/⚖️
   // se décalaient hors de l'aura sur certains PC).
-  { id: 'humilite',      name: 'Humilité',      sin: 'orgueil',     emoji: '🙏', hp: 240, value: 200 },
-  { id: 'charite',       name: 'Charité',       sin: 'avarice',     emoji: '🤲', hp: 260, value: 230 },
-  { id: 'chastete',      name: 'Chasteté',      sin: 'luxure',      emoji: '💠', hp: 280, value: 260 },
-  { id: 'bienveillance', name: 'Bienveillance', sin: 'envie',       emoji: '🤝', hp: 300, value: 290 },
-  { id: 'temperance',    name: 'Tempérance',    sin: 'gourmandise', emoji: '🍃', hp: 320, value: 320 },
-  { id: 'patience',      name: 'Patience',      sin: 'colere',      emoji: '🧘', hp: 340, value: 350 },
-  { id: 'diligence',     name: 'Diligence',     sin: 'paresse',     emoji: '🐝', hp: 360, value: 380 },
+  { id: 'humilite',      name: 'Humilité',      sin: 'orgueil',     emoji: '🙏', hp: 300, value: 200 },
+  { id: 'charite',       name: 'Charité',       sin: 'avarice',     emoji: '🤲', hp: 325, value: 230 },
+  { id: 'chastete',      name: 'Chasteté',      sin: 'luxure',      emoji: '💠', hp: 350, value: 260 },
+  { id: 'bienveillance', name: 'Bienveillance', sin: 'envie',       emoji: '🤝', hp: 375, value: 290 },
+  { id: 'temperance',    name: 'Tempérance',    sin: 'gourmandise', emoji: '🍃', hp: 400, value: 320 },
+  { id: 'patience',      name: 'Patience',      sin: 'colere',      emoji: '🧘', hp: 425, value: 350 },
+  { id: 'diligence',     name: 'Diligence',     sin: 'paresse',     emoji: '🐝', hp: 450, value: 380 },
 ];
 // Injecte chaque Vertu comme type de cible « boss vivant ».
 for (const v of VIRTUES) {
@@ -632,7 +632,7 @@ const SKILL_TREE = [
   // Serviteurs : désormais RÉSERVÉS à la Voie des Légions (reqVoie). Le premier
   // pacte de serviteurs (Esprits) exige donc d'avoir engagé la voie ; toute la
   // chaîne (Colosse, Vagabonds, Foudroyeurs) en dépend par filiation.
-  { id: 'minions',     x: 875, y: 610, parent: 'recolte', reqVoie: 'voie_legion' },
+  { id: 'minions',     x: 875, y: 620, parent: 'voie_legion', reqVoie: 'voie_legion' },
   // Débloqué seulement quand les Esprits Serviteurs sont au maximum (req).
   { id: 'demolisseur', x: 940, y: 770, parent: 'minions', req: 8 },
   // Améliorations dmg/vitesse : réservées à la Voie des Légions (reqVoie).
@@ -670,8 +670,8 @@ const SKILL_TREE = [
   // Voie des Légions (exclusive) — porte d'entrée des serviteurs. Rattachée à
   // « Récolte » (et non plus à « Esprits ») : il faut engager la voie AVANT de
   // pouvoir invoquer le moindre serviteur.
-  { id: 'voie_legion', x: 690, y: 720, parent: 'recolte', req: 1, group: 'voie' },
-  { id: 'legion_force',x: 545, y: 785, parent: 'voie_legion', req: 1 },
+  { id: 'voie_legion', x: 800, y: 525, parent: 'recolte', req: 1, group: 'voie' },
+  { id: 'legion_force',x: 700, y: 705, parent: 'voie_legion', req: 1 },
 
   // Voie du Clic Démoniaque (exclusive) — prolonge la branche du clic.
   { id: 'voie_clic',   x: 430, y: 65,  parent: 'cataclysme', req: 1, group: 'voie' },
@@ -681,8 +681,8 @@ const SKILL_TREE = [
 
   // ===== Pactes hyper-spécialisés (Astaroth) — visibles seulement en l'incarnant =====
   // Voie des Légions
-  { id: 'legion_infinie',  x: 400, y: 710,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
-  { id: 'synergie_meute',  x: 400, y: 855,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
+  { id: 'legion_infinie',  x: 610, y: 800,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
+  { id: 'synergie_meute',  x: 775, y: 815,  parent: 'legion_force', req: 1, reqVoie: 'voie_legion', reqHyper: true, hyper: true },
   { id: 'triumvirat',      x: 1200, y: 1090, reqAll: ['demo_trait', 'vagabond_trait', 'foudroyeur_trait'], reqVoie: 'voie_legion', reqHyper: true, hyper: true },
   // Voie du Clic
   { id: 'poigne_sismique', x: 360, y: 180, parent: 'clic_demon', req: 1, reqVoie: 'voie_clic', reqHyper: true, hyper: true },
