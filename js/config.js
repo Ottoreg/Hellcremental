@@ -885,8 +885,8 @@ const FAUST_PACTS = [
   },
   {
     id: 'avarice', name: 'Pacte de l\'Avare', emoji: '⏳',
-    boon: '+60 % de temps de survie', bane: '−50 % d\'âmes récoltées',
-    apply: (s) => { s.lifespan *= 1.6; s.soulMult *= 0.5; },
+    boon: '+75 % de temps de survie', bane: '−35 % d\'âmes récoltées',
+    apply: (s) => { s.lifespan *= 1.75; s.soulMult *= 0.65; },
   },
   {
     id: 'damne', name: 'Pacte du Damné', emoji: '💀',
